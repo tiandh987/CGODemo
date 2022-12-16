@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/tiandh987/CGODemo/example/go-bug-st-serial/ptz"
 	"go.bug.st/serial"
 	"log"
-	"strings"
 )
 
 func main() {
@@ -14,6 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if len(ports) == 0 {
 		log.Fatal("No serial ports found!")
 	}
@@ -25,42 +27,21 @@ func main() {
 
 	// Open the first serial port detected at 9600bps N81
 	mode := &serial.Mode{
-		BaudRate: 9600,
+		BaudRate: 57600,
 		Parity:   serial.NoParity,
 		DataBits: 8,
 		StopBits: serial.OneStopBit,
 	}
-	port, err := serial.Open(ports[1], mode)
+
+	port, err := serial.Open("/dev/ttyS2", mode)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Send the string "10,20,30\n\r" to the serial port
-	n, err := port.Write([]byte("10,20,30\n\r"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Sent %v bytes\n", n)
+	// 启动 gin 服务器
+	engine := gin.Default()
 
-	// Read and print the response
+	ptz.InitRoute(engine, port)
 
-	buff := make([]byte, 100)
-	for {
-		// Reads up to 100 bytes
-		n, err := port.Read(buff)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if n == 0 {
-			fmt.Println("\nEOF")
-			break
-		}
-
-		fmt.Printf("%s", string(buff[:n]))
-
-		// If we receive a newline stop reading
-		if strings.Contains(string(buff[:n]), "\n") {
-			break
-		}
-	}
+	engine.Run(":8089")
 }
