@@ -40,10 +40,12 @@ var _ptSpeedMap = map[PTSpeed]byte{
 
 func InitRoute(engine *gin.Engine, port serial.Port) {
 	restart(engine, port)
+	calibration(engine, port)
 	model(engine, port)
 	version(engine, port)
 	control(engine, port)
 	preset(engine, port)
+	lineScan(engine, port)
 	position(engine, port)
 
 	panMove(engine, port)
@@ -59,7 +61,7 @@ func restart(engine *gin.Engine, port serial.Port) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Sent %v bytes\n", n)
+		fmt.Printf("Sent %d bytes(%x)\n", n, bytes)
 	})
 
 	// 云台断电重启
@@ -69,7 +71,30 @@ func restart(engine *gin.Engine, port serial.Port) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Sent %v bytes\n", n)
+		fmt.Printf("Sent %d bytes(%x)\n", n, bytes)
+	})
+}
+
+// 自动原点校准
+func calibration(engine *gin.Engine, port serial.Port) {
+	calibration := engine.Group("/calibration")
+
+	// 自动校准
+	calibration.POST("", func(context *gin.Context) {
+		query := context.Query("mode")
+
+		fmt.Printf("query: %s\n", query)
+
+		mode, _ := strconv.Atoi(query)
+
+		fmt.Printf("mode: %d\n", mode)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x25, 0x00, byte(mode)).toByteSlice()
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Sent %d bytes(%x)\n", n, bytes)
 	})
 }
 
@@ -384,6 +409,136 @@ func preset(engine *gin.Engine, port serial.Port) {
 		speed, _ := strconv.Atoi(query)
 
 		bytes := newPelcodMessage(0x01, 0x00, 0x68, 0x00, byte(speed)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+}
+
+func lineScan(engine *gin.Engine, port serial.Port) {
+	line := engine.Group("/linescan")
+
+	// 设置线扫左边界停留时间
+	line.POST("/left/stay", func(context *gin.Context) {
+		tQuery := context.Query("time")
+		time, _ := strconv.Atoi(tQuery)
+
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x03, byte(time), byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 设置线扫右边界停留时间
+	line.POST("/right/stay", func(context *gin.Context) {
+		tQuery := context.Query("time")
+		time, _ := strconv.Atoi(tQuery)
+
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x05, byte(time), byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 设置线扫左边界
+	line.POST("/left/bound", func(context *gin.Context) {
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x09, 0x00, byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 设置线扫右边界
+	line.POST("/right/bound", func(context *gin.Context) {
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x0b, 0x00, byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 开始线扫
+	line.POST("/start", func(context *gin.Context) {
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x0d, 0x00, byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 删除线扫
+	line.POST("/del", func(context *gin.Context) {
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x0f, 0x00, byte(id)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 停止线扫
+	line.POST("/stop", func(context *gin.Context) {
+		bytes := newPelcodMessage(0x01, 0x00, 0x00, 0x00, 0x00).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// 线扫速度
+	line.POST("/speed", func(context *gin.Context) {
+		tSpeed := context.Query("speed")
+		speed, _ := strconv.Atoi(tSpeed)
+
+		idQuery := context.Query("id")
+		id, _ := strconv.Atoi(idQuery)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x07, PTSpeed(speed).Convert(), byte(id)).toByteSlice()
 
 		n, err := port.Write(bytes)
 		if err != nil {

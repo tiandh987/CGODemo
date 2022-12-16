@@ -8,6 +8,7 @@ import (
 	"log"
 )
 
+// GOOS=linux GOARCH=arm go build && scp go-bug-st-serial tiandenghao@172.17.132.250:/home/tiandenghao/nfsroot/SD2
 func main() {
 
 	// Retrieve the port list
