@@ -419,6 +419,7 @@ func preset(engine *gin.Engine, port serial.Port) {
 	})
 }
 
+// 线性扫描
 func lineScan(engine *gin.Engine, port serial.Port) {
 	line := engine.Group("/linescan")
 
@@ -565,6 +566,8 @@ func position(engine *gin.Engine, port serial.Port) {
 		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
 
 		replay := read(port)
+
+		fmt.Printf("pan position: %f\n", float64(int(replay[4])<<8|int(replay[5]))/float64(100))
 		fmt.Printf("pan position: %d\n", binary.BigEndian.Uint16(replay[4:6]))
 	})
 
@@ -580,6 +583,8 @@ func position(engine *gin.Engine, port serial.Port) {
 		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
 
 		replay := read(port)
+
+		fmt.Printf("tilt position: %f\n", float64(int(replay[4])<<8|int(replay[5]))/float64(100))
 		fmt.Printf("tilt position: %d\n", binary.BigEndian.Uint16(replay[4:6]))
 	})
 
@@ -595,6 +600,8 @@ func position(engine *gin.Engine, port serial.Port) {
 		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
 
 		replay := read(port)
+
+		fmt.Printf("zoom position: %f\n", float64(int(replay[4])<<8|int(replay[5]))/float64(100))
 		fmt.Printf("zoom position: %d\n", binary.BigEndian.Uint16(replay[4:6]))
 	})
 
