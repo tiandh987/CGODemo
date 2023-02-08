@@ -48,6 +48,8 @@ func InitRoute(engine *gin.Engine, port serial.Port) {
 	lineScan(engine, port)
 	position(engine, port)
 
+	limit(engine, port)
+
 	panMove(engine, port)
 }
 
@@ -409,6 +411,148 @@ func preset(engine *gin.Engine, port serial.Port) {
 		speed, _ := strconv.Atoi(query)
 
 		bytes := newPelcodMessage(0x01, 0x00, 0x68, 0x00, byte(speed)).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+}
+
+// 云台手动限位
+func limit(engine *gin.Engine, port serial.Port) {
+	limit := engine.Group("/limit")
+
+	// X轴原点
+	limit.POST("/x/origin", func(context *gin.Context) {
+		bytes := newPelcodMessage(0x01, 0x20, 0x19, 0x00, 0x00).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// X轴限位使能
+	limit.POST("/x", func(context *gin.Context) {
+		enable := context.Query("enable")
+
+		enableNum, _ := strconv.Atoi(enable)
+		fmt.Printf("param enable: %d\n", enableNum)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x1f, byte(enableNum), 0x00).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// X轴坐标左限位
+	limit.POST("/x/left", func(context *gin.Context) {
+		position := context.Query("position")
+
+		fmt.Printf("param position: %+v\n", position)
+
+		float, _ := strconv.ParseFloat(position, 2)
+
+		fmt.Printf("param position float: %+v\n", float)
+
+		var buf = make([]byte, 2)
+		binary.BigEndian.PutUint16(buf, uint16(float*100))
+
+		fmt.Printf("buf: %x\n", buf)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x21, buf[0], buf[1]).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// X轴坐标右限位
+	limit.POST("/x/right", func(context *gin.Context) {
+		position := context.Query("position")
+
+		fmt.Printf("param position: %+v\n", position)
+
+		float, _ := strconv.ParseFloat(position, 2)
+
+		fmt.Printf("param position float: %+v\n", float)
+
+		var buf = make([]byte, 2)
+		binary.BigEndian.PutUint16(buf, uint16(float*100))
+
+		fmt.Printf("buf: %x\n", buf)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x23, buf[0], buf[1]).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// Y轴限位使能
+	limit.POST("/y", func(context *gin.Context) {
+		enable := context.GetBool("enable")
+
+		fmt.Printf("param enable: %t\n", enable)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x1a, byte(0x01), 0x00).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// Y轴坐标左限位
+	limit.POST("/y/up", func(context *gin.Context) {
+		position := context.GetFloat64("position")
+
+		fmt.Printf("param position: %+v\n", position)
+
+		var buf = make([]byte, 2)
+		binary.BigEndian.PutUint16(buf, uint16(position*100))
+
+		fmt.Printf("buf: %x\n", buf)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x1b, buf[0], buf[1]).toByteSlice()
+
+		n, err := port.Write(bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Sent %d bytes (%x)\n", n, bytes)
+	})
+
+	// Y轴坐标右限位
+	limit.POST("/y/down", func(context *gin.Context) {
+		position := context.GetFloat64("position")
+
+		fmt.Printf("param position: %+v\n", position)
+
+		var buf = make([]byte, 2)
+		binary.BigEndian.PutUint16(buf, uint16(position*100))
+
+		fmt.Printf("buf: %x\n", buf)
+
+		bytes := newPelcodMessage(0x01, 0x20, 0x1d, buf[0], buf[1]).toByteSlice()
 
 		n, err := port.Write(bytes)
 		if err != nil {
