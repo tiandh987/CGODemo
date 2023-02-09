@@ -7,6 +7,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
 	"sync"
 )
 
@@ -21,7 +22,7 @@ type Blp struct {
 	serialCtl control.ControlRepo
 	mediaCtl  control.ControlRepo
 	basic     *ptz.Basic
-	preset    *preset.Preset
+	Preset    *preset.Preset
 	line      *lineScan.LineScan
 }
 
@@ -36,7 +37,7 @@ func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *ptz.Basic, preset *preset
 		serialCtl: sCtl,
 		//mediaCtl:  mCtl,
 		basic:  basic,
-		preset: preset,
+		Preset: preset,
 		line:   line,
 	}
 }
@@ -70,8 +71,7 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 		//	TODO 更新 function、funcID
 	}
 
-	// TODO 判断使用 serial 还是 media 进行通信
-	ctl := b.serialCtl
+	ctl := b.GetControl()
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -103,7 +103,7 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	case ptz.RegionScan:
 	case ptz.PanMove:
 	case ptz.Preset:
-		if err := b.preset.Start(ctl, funcID, speed); err != nil {
+		if err := b.Preset.Start(ctl, funcID, speed); err != nil {
 			return err
 		}
 	case ptz.ManualFunc:
@@ -145,4 +145,20 @@ func (b *Blp) Restart() error {
 	// TODO ctl 选择
 
 	return ctl.Restart()
+}
+
+func (b *Blp) GetControl() control.ControlRepo {
+	// TODO 判断使用 serial 还是 media 进行通信
+
+	ctl := b.serialCtl
+
+	return ctl
+}
+
+func (b *Blp) Position(pos *dsd.Position) error {
+	// TODO 判断使用 serial 还是 media 进行通信
+
+	ctl := b.serialCtl
+
+	return ctl.Goto(pos)
 }

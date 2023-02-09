@@ -1,146 +1,16 @@
 package preset
 
 import (
+	"github.com/tiandh987/CGODemo/example/rolex/config"
+	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
+	"sync"
 )
 
-//type presetRepo interface {
-//	List(def bool) (dsd.PresetPointSlice, error)
-//	Goto(id dsd.PresetID) error
-//	GotoOk(id dsd.PresetID) (bool, error)
-//	Update(point *dsd.PresetPoint) error
-//	Delete(id dsd.PresetID) error
-//	DeleteAll() error
-//	Set(point *dsd.PresetPoint) error
-//	Speed(speed Speed) error
-//	PresetID() dsd.PresetID
-//}
-//
-//type presetUseCase struct{}
-//
-//var _ presetRepo = (*presetUseCase)(nil)
-//
-//func NewPreset() presetRepo {
-//	return &presetUseCase{}
-//}
-//
-//func (p *presetUseCase) List(def bool) (dsd.PresetPointSlice, error) {
-//	ps := dsd.NewPresetSlice()
-//
-//	if !def {
-//		if err := config.GetConfig(ps.ConfigKey(), &ps); err != nil {
-//			return nil, err
-//		}
-//	}
-//
-//	return ps, nil
-//}
-//
-//func (p *presetUseCase) Goto(id dsd.PresetID) error {
-//	ps := dsd.NewPresetSlice()
-//	if err := config.GetConfig(ps.ConfigKey(), &ps); err != nil {
-//		return err
-//	}
-//
-//	if !ps[id-1].Enable {
-//		return errors.New("preset is disable")
-//	}
-//
-//	if _, err := serial.Send(protocol.PresetCall, protocol.NoneReplay, 0x00, byte(id)); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) GotoOk(id dsd.PresetID) (bool, error) {
-//	//TODO implement me
-//	return false, nil
-//}
-//
-//func (p *presetUseCase) Update(point *dsd.PresetPoint) error {
-//	ps := dsd.NewPresetSlice()
-//	if err := config.GetConfig(ps.ConfigKey(), &ps); err != nil {
-//		return err
-//	}
-//	ps[point.ID-1].Name = point.Name
-//
-//	if err := config.SetConfig(ps.ConfigKey(), ps); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) Delete(id dsd.PresetID) error {
-//	ps := dsd.NewPresetSlice()
-//	if err := config.GetConfig(ps.ConfigKey(), &ps); err != nil {
-//		return err
-//	}
-//
-//	preset, err := dsd.NewPreset(ps[id-1].ID, ps[id-1].Name)
-//	if err != nil {
-//		return err
-//	}
-//	ps[id-1] = preset
-//
-//	if err := config.SetConfig(ps.ConfigKey(), ps); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) DeleteAll() error {
-//	ps := dsd.NewPresetSlice()
-//	if err := config.SetConfig(ps.ConfigKey(), &ps); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) Set(point *dsd.PresetPoint) error {
-//	if _, err := serial.Send(protocol.PresetSet, protocol.NoneReplay, 0x00, byte(point.ID)); err != nil {
-//		return err
-//	}
-//
-//	position, err := _blpInstance.Ptz.Position()
-//	if err != nil {
-//		return err
-//	}
-//	point.Enable = true
-//	point.Position = position
-//
-//	ps := dsd.NewPresetSlice()
-//	if err := config.GetConfig(ps.ConfigKey(), &ps); err != nil {
-//		return err
-//	}
-//	ps[point.ID-1] = point
-//
-//	if err := config.SetConfig(ps.ConfigKey(), ps); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) Speed(speed Speed) error {
-//	if _, err := serial.Send(protocol.PresetSpeed, protocol.NoneReplay, 0x00, speed.Convert()); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (p *presetUseCase) PresetID() dsd.PresetID {
-//	//TODO implement me
-//	return 0
-//}
-
 type Preset struct {
+	mu      sync.RWMutex
 	presets []dsd.PresetPoint
 }
 
@@ -151,7 +21,19 @@ func New(ps []dsd.PresetPoint) *Preset {
 }
 
 func (p *Preset) Start(ctl control.ControlRepo, id int, speed ptz.Speed) error {
-	if err := ctl.Goto(p.presets[id].Position); err != nil {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	preset := p.presets[id-1]
+
+	log.Debugf("param id: %d, preset: %+v, position: %+v", id, preset, preset.Position)
+
+	if !preset.Enable {
+		log.Infof("preset %d-%s is disable", preset.ID, preset.Name)
+		return nil
+	}
+
+	if err := ctl.Goto(preset.Position); err != nil {
 		return err
 	}
 
@@ -159,5 +41,90 @@ func (p *Preset) Start(ctl control.ControlRepo, id int, speed ptz.Speed) error {
 }
 
 func (p *Preset) Stop() error {
+	return nil
+}
+
+func (p *Preset) List() ([]dsd.PresetPoint, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.presets, nil
+}
+
+func (p *Preset) Update(id dsd.PresetID, name dsd.PresetName) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	before := p.presets[id-1]
+	preset, err := dsd.NewPreset(id, name)
+	if err != nil {
+		return err
+	}
+	preset.Enable = before.Enable
+	preset.Position = before.Position
+
+	p.presets[id-1] = preset
+
+	log.Debugf("before[%p]: %+v\npreset[%p]: %+v\npresets[%d][%p]: %+v\n",
+		&before, before, &preset, preset, id-1, &(p.presets[id-1]), p.presets[id-1])
+
+	if err := config.SetConfig(preset.ConfigKey(), p.presets); err != nil {
+		p.presets[id-1] = before
+		return err
+	}
+	return nil
+}
+
+func (p *Preset) Delete(id dsd.PresetID) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	before := p.presets[id-1]
+	p.presets[id-1].Enable = false
+	if err := config.SetConfig(p.presets[id-1].ConfigKey(), p.presets); err != nil {
+		p.presets[id-1] = before
+		return err
+	}
+	return nil
+}
+
+func (p *Preset) DeleteAll() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	before := p.presets
+
+	for i, _ := range p.presets {
+		p.presets[i].Enable = false
+	}
+	if err := config.SetConfig(p.presets[0].ConfigKey(), p.presets); err != nil {
+		p.presets = before
+		return err
+	}
+	return nil
+}
+
+func (p *Preset) Set(ctl control.ControlRepo, id dsd.PresetID, name dsd.PresetName) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	preset, err := dsd.NewPreset(id, name)
+	if err != nil {
+		return err
+	}
+	preset.Enable = true
+
+	pos, err := ctl.Position()
+	if err != nil {
+		return err
+	}
+	preset.Position = pos
+
+	before := p.presets[id-1]
+	p.presets[id-1] = preset
+	if err := config.SetConfig(preset.ConfigKey(), p.presets); err != nil {
+		p.presets[id-1] = before
+		return err
+	}
 	return nil
 }

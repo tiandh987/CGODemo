@@ -1,6 +1,7 @@
 package serial
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol"
@@ -131,49 +132,69 @@ func (s *Serial) ZoomSub() error {
 }
 
 func (s *Serial) Position() (*dsd.Position, error) {
-	//pan, err := s.Send(protocol.PanGet, protocol.PanReplay, 0x00, 0x00)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//tilt, err := s.Send(protocol.TiltGet, protocol.TiltReplay, 0x00, 0x00)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//zoom, err := s.Send(protocol.ZoomGet, protocol.ZoomReplay, 0x00, 0x00)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//pos := control.Position{
-	//	Pan:  0,
-	//	Tilt: 0,
-	//	Zoom: 0,
-	//}
-	//external := pos.External(pan, tilt, zoom)
-	//
-	//log.Debugf("pan: %x - %d, tilt: %x - %d, zoom: %x - %d, external: %+v",
-	//	pan, pan, tilt, tilt, zoom, zoom, external)
-	//
-	return nil, nil
+	pan, err := s.Send(protocol.PanGet, protocol.PanReplay, 0x00, 0x00)
+	if err != nil {
+		return nil, err
+	}
+
+	tilt, err := s.Send(protocol.TiltGet, protocol.TiltReplay, 0x00, 0x00)
+	if err != nil {
+		return nil, err
+	}
+
+	zoom, err := s.Send(protocol.ZoomGet, protocol.ZoomReplay, 0x00, 0x00)
+	if err != nil {
+		return nil, err
+	}
+
+	pos, err := s.externalPosition(pan, tilt, zoom)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("pan: %x - %.2f, tilt: %x - %.2f, zoom: %x - %.2f",
+		pan, pos.Pan, tilt, pos.Tilt, zoom, pos.Zoom)
+
+	return pos, nil
 }
 
-func (s *Serial) Goto(position *dsd.Position) error {
-	//pos := &ptzPosition{}
-	//pos.Internal(position)
-	//
-	//if _, err := p.serial.Send(protocol.PanSet, protocol.NoneReplay, pos.pan[0], pos.pan[1]); err != nil {
-	//	return err
-	//}
-	//
-	//if _, err := p.serial.Send(protocol.TiltSet, protocol.NoneReplay, pos.tilt[0], pos.tilt[1]); err != nil {
-	//	return err
-	//}
-	//
-	//if _, err := p.serial.Send(protocol.ZoomSet, protocol.NoneReplay, pos.zoom[0], pos.zoom[1]); err != nil {
-	//	return err
-	//}
-	//
+func (s *Serial) Goto(pos *dsd.Position) error {
+	pan, tilt, zoom := s.internalPosition(pos)
+
+	log.Debugf("pan: %x - %.2f, tilt: %x - %.2f, zoom: %x - %.2f",
+		pan, pos.Pan, tilt, pos.Tilt, zoom, pos.Zoom)
+
+	if _, err := s.Send(protocol.PanSet, protocol.NoneReplay, pan[0], pan[1]); err != nil {
+		return err
+	}
+
+	if _, err := s.Send(protocol.TiltSet, protocol.NoneReplay, tilt[0], tilt[1]); err != nil {
+		return err
+	}
+
+	if _, err := s.Send(protocol.ZoomSet, protocol.NoneReplay, zoom[0], zoom[1]); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s *Serial) externalPosition(pan, tilt, zoom []byte) (*dsd.Position, error) {
+	return &dsd.Position{
+		Pan:  float64(int(pan[0])<<8|int(pan[1])) / float64(100),
+		Tilt: float64(int(tilt[0])<<8|int(tilt[1])) / float64(100),
+		Zoom: float64(int(zoom[0])<<8|int(zoom[1])) / float64(100),
+	}, nil
+}
+
+func (s *Serial) internalPosition(pos *dsd.Position) (pan, tilt, zoom []byte) {
+	pan = make([]byte, 2)
+	tilt = make([]byte, 2)
+	zoom = make([]byte, 2)
+
+	binary.BigEndian.PutUint16(pan, uint16(pos.Pan*100))
+	binary.BigEndian.PutUint16(tilt, uint16(pos.Tilt*100))
+	binary.BigEndian.PutUint16(zoom, uint16(pos.Zoom*100))
+
+	return
 }

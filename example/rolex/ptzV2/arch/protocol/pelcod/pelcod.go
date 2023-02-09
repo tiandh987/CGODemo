@@ -68,7 +68,7 @@ func (p *pelcoDUseCase) Instruct(ct protocol.CommandType, data1, data2 byte) []b
 	instruct[CMD2] = _cmdMap[ct][1]
 	instruct[DATA1] = data1
 	instruct[DATA2] = data2
-	instruct[CHECKSUM] = (instruct[ADDR] + instruct[CMD1] + instruct[CMD2] + instruct[DATA1] + instruct[DATA2]) % 100
+	instruct[CHECKSUM] = instruct[ADDR] + instruct[CMD1] + instruct[CMD2] + instruct[DATA1] + instruct[DATA2]
 
 	log.Debugf("command type: %d, data1: %d, data2: %d, instruct: %x", ct, data1, data2, instruct)
 
