@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/pflag"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/config"
@@ -18,11 +17,11 @@ import (
 
 // loginResponse
 type Response struct {
-	Code      int64  `json:"Code"`      // 200
-	Data      string `json:"Data"`      // 返回数据
-	Detail    string `json:"Detail"`    // 详细错误信息
-	Message   string `json:"Message"`   // msg: success
-	Translate string `json:"Translate"` // 操作成功
+	Code      int64       `json:"Code"`      // 200
+	Data      interface{} `json:"Data"`      // 返回数据
+	Detail    string      `json:"Detail"`    // 详细错误信息
+	Message   string      `json:"Message"`   // msg: success
+	Translate string      `json:"Translate"` // 操作成功
 }
 
 // GOOS=linux GOARCH=arm go build -a && mv rolex rolex_test && scp rolex_test tiandenghao@172.17.132.250:/home/tiandenghao/nfsroot/rolex_nb
@@ -227,6 +226,7 @@ func main() {
 	})
 
 	presetRouter(engine)
+	lineRouter(engine)
 
 	engine.Run(":8089")
 
@@ -237,16 +237,11 @@ func presetRouter(engine *gin.Engine) {
 
 	// 获取所有预置点
 	presetGroup.GET("/getpresets", func(c *gin.Context) {
-		list, err := blp.Instance().Preset.List()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
-		}
+		list := blp.Instance().ListPreset()
 
-		listStr, _ := json.Marshal(list)
 		c.JSON(http.StatusOK, Response{
 			Code:      200,
-			Data:      string(listStr),
+			Data:      list,
 			Detail:    "",
 			Message:   "",
 			Translate: "",
@@ -285,7 +280,7 @@ func presetRouter(engine *gin.Engine) {
 
 		name := c.Query("name")
 
-		if err := blp.Instance().Preset.Update(dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
+		if err := blp.Instance().UpdatePreset(dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -304,7 +299,7 @@ func presetRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().Preset.Delete(dsd.PresetID(idNum)); err != nil {
+		if err := blp.Instance().DeletePreset(dsd.PresetID(idNum)); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -315,7 +310,7 @@ func presetRouter(engine *gin.Engine) {
 
 	// 删除全部预置点
 	presetGroup.DELETE("/removepresets", func(c *gin.Context) {
-		if err := blp.Instance().Preset.DeleteAll(); err != nil {
+		if err := blp.Instance().DeleteAllPreset(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -336,12 +331,155 @@ func presetRouter(engine *gin.Engine) {
 
 		name := c.Query("name")
 
-		if err := blp.Instance().Preset.Set(blp.Instance().GetControl(), dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
+		if err := blp.Instance().SetPreset(dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
 		c.JSON(http.StatusOK, "set preset ok")
+		return
+	})
+}
+
+func lineRouter(engine *gin.Engine) {
+	lineGroup := engine.Group("/v1/ptz/linearscan")
+
+	// 获取线性扫描配置
+	lineGroup.GET("", func(c *gin.Context) {
+
+		list := blp.Instance().ListLine()
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      list,
+			Detail:    "",
+			Message:   "get linear scan success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 获取线性扫描配置
+	lineGroup.PUT("", func(c *gin.Context) {
+
+		if err := blp.Instance().DefaultLine(); err != nil {
+			log.Error(err.Error())
+			return
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "default linear scan success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 设置线性扫描参数
+	lineGroup.POST("", func(c *gin.Context) {
+
+		var line dsd.LineScan
+
+		if c.ShouldBind(&line) != nil {
+			c.JSON(401, gin.H{"status": "bind error"})
+			return
+		}
+
+		log.Infof("line: %+v", line)
+
+		if err := line.Validate(); err != nil {
+			log.Error(err.Error())
+			c.JSON(400, gin.H{"status": "bad param"})
+			return
+		}
+
+		if err := blp.Instance().SetLine(&line); err != nil {
+			log.Error(err.Error())
+			return
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "set linear scan success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 开始线扫
+	lineGroup.POST("/start", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		if err := blp.Instance().Control(ptz.Manual, ptz.LineScan, idNum, 0, 0); err != nil {
+			log.Error(err.Error())
+			c.JSON(500, "line start failed")
+			return
+		}
+
+		c.JSON(200, "success")
+		return
+	})
+
+	// 停止线扫
+	lineGroup.POST("/stop", func(c *gin.Context) {
+		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+			log.Error(err.Error())
+			c.JSON(500, "line start failed")
+			return
+		}
+
+		c.JSON(200, "success")
+		return
+	})
+
+	// 设置线性扫描左右边界
+	lineGroup.POST("/limit", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		limit := c.Query("limit")
+		limitNum, err := strconv.Atoi(limit)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		clear := c.Query("clear")
+		clearBool, err := strconv.ParseBool(clear)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		if err := blp.Instance().SetLineMargin(dsd.LineScanID(idNum), limitNum, clearBool); err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+
+		}
+
+		c.JSON(200, "success")
 		return
 	})
 }

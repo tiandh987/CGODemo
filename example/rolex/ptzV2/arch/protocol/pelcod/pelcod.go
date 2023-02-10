@@ -70,7 +70,7 @@ func (p *pelcoDUseCase) Instruct(ct protocol.CommandType, data1, data2 byte) []b
 	instruct[DATA2] = data2
 	instruct[CHECKSUM] = instruct[ADDR] + instruct[CMD1] + instruct[CMD2] + instruct[DATA1] + instruct[DATA2]
 
-	log.Debugf("command type: %d, data1: %d, data2: %d, instruct: %x", ct, data1, data2, instruct)
+	log.Debugf("command type: %d, data1: %x, data2: %x, instruct: %x", ct, data1, data2, instruct)
 
 	return instruct
 }
@@ -80,8 +80,6 @@ func (p *pelcoDUseCase) InstructLen() int {
 }
 
 func (p *pelcoDUseCase) CheckReplay(rt protocol.ReplayType, replay []byte) error {
-	log.Debugf("replay type: %d, replay data: %x", rt, replay)
-
 	if _replayCmdMap[rt][0] == replay[CMD1] && _replayCmdMap[rt][1] == replay[CMD2] {
 		return nil
 	}
@@ -90,7 +88,5 @@ func (p *pelcoDUseCase) CheckReplay(rt protocol.ReplayType, replay []byte) error
 }
 
 func (p *pelcoDUseCase) ReplayData(replay []byte) []byte {
-	log.Debugf("replay data: %x", replay)
-
 	return replay[DATA1:CHECKSUM]
 }

@@ -27,11 +27,3 @@ func TestNewPreset(t *testing.T) {
 	//}
 	//t.Logf("preset256: %+v, position: %+v", preset256, preset256.Position)
 }
-
-func TestNewPresetSlice(t *testing.T) {
-	ps := NewPresetSlice()
-
-	for i, preset := range ps {
-		t.Logf("index: %d, preset: %+v, position: %+v", i, preset, preset.Position)
-	}
-}

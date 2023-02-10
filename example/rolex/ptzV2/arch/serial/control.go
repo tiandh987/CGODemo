@@ -152,9 +152,6 @@ func (s *Serial) Position() (*dsd.Position, error) {
 		return nil, err
 	}
 
-	log.Debugf("pan: %x - %.2f, tilt: %x - %.2f, zoom: %x - %.2f",
-		pan, pos.Pan, tilt, pos.Tilt, zoom, pos.Zoom)
-
 	return pos, nil
 }
 

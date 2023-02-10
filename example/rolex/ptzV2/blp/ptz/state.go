@@ -143,19 +143,6 @@ func (s *State) Change(trigger Trigger, function Function, funcID int, cronID in
 	return nil
 }
 
-func (s *State) Stop(function Function) error {
-	switch function {
-	case Cruise:
-	case Trace:
-	case LineScan:
-	case RegionScan:
-	case PanMove:
-	case Preset:
-	case ManualFunc:
-	}
-	return nil
-}
-
 func (s *State) Version() string {
 	return s.version
 }

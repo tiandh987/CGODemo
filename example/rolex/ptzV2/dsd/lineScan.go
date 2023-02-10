@@ -23,9 +23,9 @@ func (i LineScanID) Validate() error {
 type LineScan struct {
 	Enable             bool       `json:"Enable" validate:"boolean"`                           // 使能
 	ID                 LineScanID `json:"ID" validate:"required,gte=1,lte=5"`                  // 线性扫描id
-	LeftMargin         float64    `json:"LeftMargin" validate:"required,gte=-1,lte=360"`       // 设置左边界，-1 清除边界
+	LeftMargin         float64    `json:"LeftMargin" validate:"gte=-1,lte=360"`                // 设置左边界，-1 清除边界
 	ResidenceTimeLeft  int        `json:"ResidenceTimeLeft" validate:"required,gte=1,lte=60"`  // 停留时间（左）秒
-	RightMargin        float64    `json:"RightMargin" validate:"required,gte=-1,lte=360"`      // 设置右边界，-1 清除边界
+	RightMargin        float64    `json:"RightMargin" validate:"gte=-1,lte=360"`               // 设置右边界，-1 清除边界
 	ResidenceTimeRight int        `json:"ResidenceTimeRight" validate:"required,gte=1,lte=60"` // 停留时间（右）秒
 	Runing             bool       `json:"Runing" validate:"boolean"`                           // 运行状态
 	Speed              int        `json:"Speed" validate:"required,gte=1,lte=8"`               // 线扫速度 1-8 1:最慢 8:最快

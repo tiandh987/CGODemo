@@ -100,16 +100,12 @@ func (s *Serial) Send(ct protocol.CommandType, rt protocol.ReplayType, data1, da
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	log.Debugf("serial write param, CommandType: %d, ReplayType: %d, data1: %x, data2: %x",
-		ct, rt, data1, data2)
-
 	instruct := s.protocol.Instruct(ct, data1, data2)
-	n, err := s.port.Write(instruct)
+	_, err := s.port.Write(instruct)
 	if err != nil {
 		log.Errorf("write [%x] to serial failed, err: %s", instruct, err.Error())
 		return nil, errors.New("write to serial failed")
 	}
-	log.Debugf("write serial number: %d", n)
 
 	if rt == protocol.NoneReplay {
 		return nil, nil
@@ -140,6 +136,5 @@ func (s *Serial) Send(ct protocol.CommandType, rt protocol.ReplayType, data1, da
 		break
 	}
 
-	log.Debugf("replay data: %x", replay)
 	return replay, nil
 }
