@@ -2,7 +2,6 @@ package pelcod
 
 import (
 	"errors"
-	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol"
 )
 
@@ -70,7 +69,7 @@ func (p *pelcoDUseCase) Instruct(ct protocol.CommandType, data1, data2 byte) []b
 	instruct[DATA2] = data2
 	instruct[CHECKSUM] = instruct[ADDR] + instruct[CMD1] + instruct[CMD2] + instruct[DATA1] + instruct[DATA2]
 
-	log.Debugf("command type: %d, data1: %x, data2: %x, instruct: %x", ct, data1, data2, instruct)
+	//log.Debugf("command type: %d, data1: %x, data2: %x, instruct: %x", ct, data1, data2, instruct)
 
 	return instruct
 }

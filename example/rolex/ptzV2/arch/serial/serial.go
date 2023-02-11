@@ -120,7 +120,7 @@ func (s *Serial) Send(ct protocol.CommandType, rt protocol.ReplayType, data1, da
 			log.Warnf("read replay data length is invalid. len: %d, data: %x", n, buff[:n])
 			continue
 		}
-		log.Debugf("read data length: %d, data: %x", n, buff[:n])
+		//log.Debugf("read data length: %d, data: %x", n, buff[:n])
 
 		if err != nil {
 			log.Errorf("read replay data from serial failed, err: %s", err.Error())

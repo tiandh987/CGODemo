@@ -3,6 +3,7 @@ package lineScan
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/tiandh987/CGODemo/example/rolex/config"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
@@ -16,21 +17,43 @@ type LineScan struct {
 	mu    sync.RWMutex
 	lines []dsd.LineScan
 
-	state   lineState
-	timer   *time.Timer
-	stateCh chan struct{}
-	errCh   chan error
-	quit    chan struct{}
+	state *state
+	timer *time.Timer
+	errCh chan error
+	quit  chan struct{}
+}
+
+type state struct {
+	lst lineState
+	ch  chan struct{}
+}
+
+func newState() *state {
+	return &state{
+		lst: none,
+		ch:  make(chan struct{}, 1),
+	}
+}
+
+func (s *state) reset() {
+	s.lst = none
+	s.ch = make(chan struct{}, 1)
+}
+
+func (s *state) update(lst lineState) {
+	s.lst = lst
+	if lst != leftResidence && lst != rightResidence {
+		s.ch <- struct{}{}
+	}
 }
 
 func New(lines []dsd.LineScan) *LineScan {
 	return &LineScan{
-		lines:   lines,
-		state:   none,
-		timer:   time.NewTimer(time.Hour),
-		stateCh: make(chan struct{}, 1),
-		errCh:   make(chan error, 1),
-		quit:    make(chan struct{}, 1),
+		lines: lines,
+		state: newState(),
+		timer: time.NewTimer(time.Hour),
+		errCh: make(chan error, 1),
+		quit:  make(chan struct{}, 1),
 	}
 }
 
@@ -54,7 +77,7 @@ func (l *LineScan) Start(ctl control.ControlRepo, id dsd.LineScanID) error {
 		return err
 	}
 
-	if l.state != none {
+	if l.state.lst != none {
 		log.Warn("linear scan is running")
 		return errors.New("linear scan is running")
 	}
@@ -62,13 +85,14 @@ func (l *LineScan) Start(ctl control.ControlRepo, id dsd.LineScanID) error {
 	line := l.getLine(id)
 	if !line.Enable {
 		log.Warnf("linear scan %d is disable", id)
-		return nil
+		return errors.New(fmt.Sprintf("linear scan %d is disable", id))
 	}
 
 	go func() {
 		log.Infof("start of linear scan...\nconfig: %+v", line)
 
 		ctx, cancelFunc := context.WithCancel(context.Background())
+		defer cancelFunc()
 
 		l.setLineRunning(id, true)
 		if err := l.saveConfig(); err != nil {
@@ -76,13 +100,12 @@ func (l *LineScan) Start(ctl control.ControlRepo, id dsd.LineScanID) error {
 			goto EndLinearScan
 		}
 
+		l.state.reset()
 		// 线扫没有左右边界限制
 		if line.LeftMargin == MarginNoLimit || line.RightMargin == MarginNoLimit {
-			l.state = noLimit
-			l.stateCh <- struct{}{}
+			l.state.update(noLimit)
 		} else {
-			l.state = none
-			l.stateCh <- struct{}{}
+			l.state.update(none)
 		}
 
 		for {
@@ -93,35 +116,34 @@ func (l *LineScan) Start(ctl control.ControlRepo, id dsd.LineScanID) error {
 				log.Error(err.Error())
 				goto EndLinearScan
 			case <-l.timer.C:
-				switch l.state {
+				switch l.state.lst {
 				case leftResidence:
 					l.leftResidence()
 				case rightResidence:
 					l.rightResidence()
 				}
-			case <-l.stateCh:
-				switch l.state {
+			case <-l.state.ch:
+				switch l.state.lst {
 				case none:
-					l.gotoLeftMargin(ctx, ctl, id)
+					l.gotoLeftMargin(ctx, ctl, &line)
 				case noLimit:
-					l.noLimit(ctl, id)
+					l.noLimit(ctl, &line)
 				case leftMargin:
-					l.leftMargin(id)
+					l.leftMargin(&line)
 				case leftToRight:
-					l.leftToRight(ctx, ctl, id)
+					l.leftToRight(ctx, ctl, &line)
 				case rightMargin:
-					l.rightMargin(id)
+					l.rightMargin(&line)
 				case rightToLeft:
-					l.rightToLeft(ctx, ctl, id)
+					l.rightToLeft(ctx, ctl, &line)
 				}
 			}
 		}
 	EndLinearScan:
 		log.Infof("end linear scan (%d)", id)
 
-		cancelFunc()
 		ctl.Stop()
-		l.state = none
+		l.state.reset()
 		l.setLineRunning(id, false)
 		l.saveConfig()
 	}()
@@ -130,22 +152,18 @@ func (l *LineScan) Start(ctl control.ControlRepo, id dsd.LineScanID) error {
 }
 
 func (l *LineScan) Stop() {
-	if l.state != none {
+	if l.state.lst != none {
 		l.quit <- struct{}{}
 	}
 }
 
-func (l *LineScan) noLimit(ctl control.ControlRepo, id dsd.LineScanID) {
-	line := l.getLine(id)
-
+func (l *LineScan) noLimit(ctl control.ControlRepo, line *dsd.LineScan) {
 	if err := ctl.Left(ptz.Speed(line.Speed).Convert()); err != nil {
 		l.errCh <- err
 	}
 }
 
-func (l *LineScan) gotoLeftMargin(ctx context.Context, ctl control.ControlRepo, id dsd.LineScanID) {
-	line := l.getLine(id)
-
+func (l *LineScan) gotoLeftMargin(ctx context.Context, ctl control.ControlRepo, line *dsd.LineScan) {
 	pos, err := ctl.Position()
 	if err != nil {
 		l.errCh <- err
@@ -161,25 +179,22 @@ func (l *LineScan) gotoLeftMargin(ctx context.Context, ctl control.ControlRepo, 
 	l.arrivePan(ctx, ctl, line.LeftMargin, leftMargin)
 }
 
-func (l *LineScan) leftMargin(id dsd.LineScanID) {
-	log.Debugf("linear scan (%d) left margin", id)
+func (l *LineScan) leftMargin(line *dsd.LineScan) {
+	log.Debugf("linear scan (%d) left margin", line.ID)
 
-	line := l.getLine(id)
 	l.timer.Reset(time.Second * time.Duration(line.ResidenceTimeLeft))
-	l.state = leftResidence
+	l.state.update(leftResidence)
 }
 
 func (l *LineScan) leftResidence() {
 	log.Debug("end of linear scan left residence")
 
-	l.state = leftToRight
-	l.stateCh <- struct{}{}
+	l.state.update(leftToRight)
 }
 
-func (l *LineScan) leftToRight(ctx context.Context, ctl control.ControlRepo, id dsd.LineScanID) {
-	log.Debugf("linear scan (%d) from left to right", id)
+func (l *LineScan) leftToRight(ctx context.Context, ctl control.ControlRepo, line *dsd.LineScan) {
+	log.Debugf("linear scan (%d) from left to right", line.ID)
 
-	line := l.getLine(id)
 	if err := ctl.Right(ptz.Speed(line.Speed).Convert()); err != nil {
 		l.errCh <- err
 		return
@@ -188,25 +203,22 @@ func (l *LineScan) leftToRight(ctx context.Context, ctl control.ControlRepo, id 
 	l.arrivePan(ctx, ctl, line.RightMargin, rightMargin)
 }
 
-func (l *LineScan) rightMargin(id dsd.LineScanID) {
-	log.Debugf("linear scan (%d) right margin", id)
+func (l *LineScan) rightMargin(line *dsd.LineScan) {
+	log.Debugf("linear scan (%d) right margin", line.ID)
 
-	line := l.getLine(id)
 	l.timer.Reset(time.Second * time.Duration(line.ResidenceTimeRight))
-	l.state = rightResidence
+	l.state.update(rightResidence)
 }
 
 func (l *LineScan) rightResidence() {
 	log.Debug("end of linear scan right residence")
 
-	l.state = rightToLeft
-	l.stateCh <- struct{}{}
+	l.state.update(rightToLeft)
 }
 
-func (l *LineScan) rightToLeft(ctx context.Context, ctl control.ControlRepo, id dsd.LineScanID) {
-	log.Debugf("linear scan (%d) from right to left", id)
+func (l *LineScan) rightToLeft(ctx context.Context, ctl control.ControlRepo, line *dsd.LineScan) {
+	log.Debugf("linear scan (%d) from right to left", line.ID)
 
-	line := l.getLine(id)
 	if err := ctl.Left(ptz.Speed(line.Speed).Convert()); err != nil {
 		l.errCh <- err
 		return
@@ -215,8 +227,7 @@ func (l *LineScan) rightToLeft(ctx context.Context, ctl control.ControlRepo, id 
 	l.arrivePan(ctx, ctl, line.LeftMargin, leftMargin)
 }
 
-func (l *LineScan) arrivePan(ctx context.Context, ctl control.ControlRepo, pan float64, state lineState) {
-
+func (l *LineScan) arrivePan(ctx context.Context, ctl control.ControlRepo, pan float64, lst lineState) {
 	go func() {
 		timer := time.NewTimer(time.Second * 300)
 
@@ -240,9 +251,7 @@ func (l *LineScan) arrivePan(ctx context.Context, ctl control.ControlRepo, pan f
 						return
 					}
 
-					l.state = state
-					l.stateCh <- struct{}{}
-
+					l.state.update(lst)
 					return
 				}
 				time.Sleep(time.Millisecond * 10)

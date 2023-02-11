@@ -5,6 +5,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/serial"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
@@ -26,13 +27,14 @@ type Blp struct {
 	basic     *basic.Basic
 	preset    *preset.Preset
 	line      *lineScan.LineScan
+	cruise    *cruise.Cruise
 }
 
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
 //	line *lineScan.LineScan) *Blp {
 
 func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *preset.Preset,
-	line *lineScan.LineScan) *Blp {
+	line *lineScan.LineScan, cruise *cruise.Cruise) *Blp {
 
 	return &Blp{
 		state:     st,
@@ -41,6 +43,7 @@ func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *pres
 		basic:  basic,
 		preset: preset,
 		line:   line,
+		cruise: cruise,
 	}
 }
 
@@ -81,6 +84,7 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	// 停止当前云台正在运行的动作
 	switch b.state.Function() {
 	case ptz.Cruise:
+		b.cruise.Stop()
 	case ptz.Trace:
 	case ptz.LineScan:
 		b.line.Stop()
@@ -102,6 +106,7 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	// 转动云台
 	switch function {
 	case ptz.Cruise:
+		b.cruise.Start(ctl, b.preset, dsd.CruiseID(funcID))
 	case ptz.Trace:
 	case ptz.LineScan:
 		if err := b.line.Start(ctl, dsd.LineScanID(funcID)); err != nil {

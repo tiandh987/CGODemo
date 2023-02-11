@@ -45,7 +45,17 @@ func Start() error {
 		return err
 	}
 
-	blpInstance := blp.New(limit, "", ptz, presets, lines)
+	// 巡迹
+	cruise := dsd.TourPreset{}
+	cruises := cruise.Default()
+	if err := config.SetDefault(cruise.ConfigKey(), cruises); err != nil {
+		return err
+	}
+	if err := config.GetConfig(cruise.ConfigKey(), &cruises); err != nil {
+		return err
+	}
+
+	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises)
 	blp.Replace(blpInstance)
 
 	return nil

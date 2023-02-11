@@ -227,6 +227,7 @@ func main() {
 
 	presetRouter(engine)
 	lineRouter(engine)
+	cruiseRouter(engine)
 
 	engine.Run(":8089")
 
@@ -477,6 +478,152 @@ func lineRouter(engine *gin.Engine) {
 				Translate: "",
 			})
 
+		}
+
+		c.JSON(200, "success")
+		return
+	})
+}
+
+func cruiseRouter(engine *gin.Engine) {
+	cruiseGroup := engine.Group("/v1/ptz/tour")
+
+	// 获取巡航组配置
+	cruiseGroup.GET("/gettours", func(c *gin.Context) {
+
+		cruises := blp.Instance().ListCruise()
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      cruises,
+			Detail:    "",
+			Message:   "get cruise success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 巡航组恢复默认配置
+	cruiseGroup.PUT("", func(c *gin.Context) {
+
+		if err := blp.Instance().DefaultCruise(); err != nil {
+			c.JSON(400, Response{
+				Code:      400,
+				Data:      "",
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "get cruise success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 修改巡航组名称
+	cruiseGroup.PUT("/modifytour", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		name := c.Query("name")
+
+		if err := blp.Instance().UpdateCruise(dsd.CruiseID(idNum), dsd.CruiseName(name)); err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, "modify cruise ok")
+		return
+	})
+
+	// 清除巡航线路
+	cruiseGroup.DELETE("/removetour", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		if err := blp.Instance().DeleteCruise(dsd.CruiseID(idNum)); err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, "delete cruise ok")
+		return
+	})
+
+	// 设置巡航线路
+	cruiseGroup.POST("/settour", func(c *gin.Context) {
+		var cruise dsd.TourPreset
+
+		if c.ShouldBind(&cruise) != nil {
+			c.JSON(401, gin.H{"status": "bind error"})
+			return
+		}
+
+		log.Infof("cruise: %+v", cruise)
+
+		//if err := cruise.Validate(); err != nil {
+		//	log.Error(err.Error())
+		//	c.JSON(400, gin.H{"status": "bad param"})
+		//	return
+		//}
+
+		if err := blp.Instance().SetCruise(&cruise); err != nil {
+			log.Error(err.Error())
+			return
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "set cruise success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 开始
+	cruiseGroup.PUT("/starttour", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		if err := blp.Instance().Control(ptz.Manual, ptz.Cruise, idNum, 0, 0); err != nil {
+			log.Error(err.Error())
+			c.JSON(500, "cruise start failed")
+			return
+		}
+
+		c.JSON(200, "success")
+		return
+	})
+
+	// 停止
+	cruiseGroup.PUT("/stoptour", func(c *gin.Context) {
+		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+			log.Error(err.Error())
+			c.JSON(500, "cruise start failed")
+			return
 		}
 
 		c.JSON(200, "success")

@@ -19,9 +19,11 @@ func (l *LineScan) Default() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.state != none {
+	if l.state.lst != none {
 		return errors.New("linear scan is running")
 	}
+
+	before := l.lines
 
 	lines := make([]dsd.LineScan, dsd.MaxLineScanNum)
 	for id := 1; id <= dsd.MaxLineScanNum; id++ {
@@ -32,11 +34,11 @@ func (l *LineScan) Default() error {
 		lines[id-1] = lineScan
 	}
 
+	l.lines = lines
 	if err := l.saveConfig(); err != nil {
+		l.lines = before
 		return err
 	}
-
-	l.lines = lines
 
 	return nil
 }
@@ -45,7 +47,7 @@ func (l *LineScan) Set(scan *dsd.LineScan) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.lines[scan.ID-1].Runing {
+	if l.state.lst != none && l.lines[scan.ID-1].Runing {
 		return errors.New(fmt.Sprintf("linear scan %d is running", scan.ID))
 	}
 
@@ -74,7 +76,7 @@ func (l *LineScan) SetMargin(ctl control.ControlRepo, id dsd.LineScanID, op Oper
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.state != none && l.lines[id-1].Runing {
+	if l.state.lst != none && l.lines[id-1].Runing {
 		return errors.New(fmt.Sprintf("linear scan %d is running", id))
 	}
 
