@@ -55,8 +55,19 @@ func Start() error {
 		return err
 	}
 
-	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises)
+	// 开机动作
+	ups := dsd.NewPowerUps()
+	if err := config.SetDefault(ups.ConfigKey(), ups); err != nil {
+		return err
+	}
+	if err := config.GetConfig(ups.ConfigKey(), &ups); err != nil {
+		return err
+	}
+
+	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises, ups)
 	blp.Replace(blpInstance)
+
+	blp.Instance().StartPowerUp()
 
 	return nil
 }

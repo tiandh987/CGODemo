@@ -7,6 +7,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
@@ -28,13 +29,14 @@ type Blp struct {
 	preset    *preset.Preset
 	line      *lineScan.LineScan
 	cruise    *cruise.Cruise
+	power     *powerUp.PowerUp
 }
 
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
 //	line *lineScan.LineScan) *Blp {
 
 func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *preset.Preset,
-	line *lineScan.LineScan, cruise *cruise.Cruise) *Blp {
+	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp) *Blp {
 
 	return &Blp{
 		state:     st,
@@ -44,6 +46,7 @@ func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *pres
 		preset: preset,
 		line:   line,
 		cruise: cruise,
+		power:  power,
 	}
 }
 

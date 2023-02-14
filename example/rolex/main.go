@@ -142,7 +142,13 @@ func main() {
 		dirNum, err := strconv.Atoi(direction)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusOK, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -155,16 +161,21 @@ func main() {
 		}
 
 		if err := ptz.Operation(dirNum).ValidateDirection(); err != nil {
+			log.Error(err.Error())
+
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
 		if err := ptz.Speed(speedNum).Validate(); err != nil {
+			log.Error(err.Error())
+
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
 		if err := blp.Instance().Control(ptz.Manual, ptz.ManualFunc, dirNum, 0, ptz.Speed(speedNum)); err != nil {
+			log.Error(err.Error())
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -228,6 +239,7 @@ func main() {
 	presetRouter(engine)
 	lineRouter(engine)
 	cruiseRouter(engine)
+	powerRouter(engine)
 
 	engine.Run(":8089")
 
@@ -627,6 +639,86 @@ func cruiseRouter(engine *gin.Engine) {
 		}
 
 		c.JSON(200, "success")
+		return
+	})
+}
+
+func powerRouter(engine *gin.Engine) {
+	powerGroup := engine.Group("/v1/ptz/powerUpAction")
+
+	// 获取开机动作
+	powerGroup.GET("", func(c *gin.Context) {
+
+		up, err := blp.Instance().GetPowerUp()
+		if err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      up,
+			Detail:    "",
+			Message:   "get power up success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 设置开机动作
+	powerGroup.POST("", func(c *gin.Context) {
+
+		var ups dsd.PowerUps
+
+		if c.ShouldBind(&ups) != nil {
+			c.JSON(401, gin.H{"status": "bind error"})
+		}
+
+		if err := blp.Instance().SetPowerUp(&ups); err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      nil,
+			Detail:    "",
+			Message:   "set power up success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 开机动作恢复默认配置
+	powerGroup.PUT("/defaultconfig", func(c *gin.Context) {
+
+		if err := blp.Instance().DefaultPowerUp(); err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+		}
+
+		c.JSON(200, Response{
+			Code:      200,
+			Data:      nil,
+			Detail:    "",
+			Message:   "default power up success",
+			Translate: "",
+		})
 		return
 	})
 }

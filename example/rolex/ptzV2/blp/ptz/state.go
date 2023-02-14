@@ -103,7 +103,7 @@ func (s *State) Validate(trigger Trigger, l *Limit) error {
 	}
 
 	// 云台处于运动状态，判断触发者优先级
-	if !s.trigger.Compare(trigger) {
+	if s.trigger.Compare(trigger) {
 		return errors.New("trigger is low priority")
 	}
 
