@@ -14,3 +14,12 @@ func NewPosition() *Position {
 		Zoom: 1,
 	}
 }
+
+type Status struct {
+	Moving       bool  `json:"Moving" validate:"boolean"`
+	Trigger      int   `json:"Trigger" validate:"required,gte=0,lte=4"`
+	Function     int   `json:"Function" validate:"required,gte=0,lte=5"`
+	FunctionID   int   `json:"FunctionID" validate:"required"`
+	TimingTaskID int   `json:"TimingTaskID" validate:"required,gte=1,lte=4"`
+	StartTime    int64 `json:"StartTime" validate:"required"`
+}

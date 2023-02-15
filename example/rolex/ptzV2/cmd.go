@@ -64,10 +64,20 @@ func Start() error {
 		return err
 	}
 
-	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises, ups)
+	// 空闲动作
+	motion := dsd.NewIdleMotion()
+	if err := config.SetDefault(motion.ConfigKey(), motion); err != nil {
+		return err
+	}
+	if err := config.GetConfig(motion.ConfigKey(), &motion); err != nil {
+		return err
+	}
+
+	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises, ups, motion)
 	blp.Replace(blpInstance)
 
 	blp.Instance().StartPowerUp()
+	blp.Instance().StartIdle()
 
 	return nil
 }

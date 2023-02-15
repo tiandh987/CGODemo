@@ -6,6 +6,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/idle"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
@@ -30,13 +31,14 @@ type Blp struct {
 	line      *lineScan.LineScan
 	cruise    *cruise.Cruise
 	power     *powerUp.PowerUp
+	idle      *idle.Idle
 }
 
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
 //	line *lineScan.LineScan) *Blp {
 
 func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *preset.Preset,
-	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp) *Blp {
+	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp, idle *idle.Idle) *Blp {
 
 	return &Blp{
 		state:     st,
@@ -47,6 +49,7 @@ func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *pres
 		line:   line,
 		cruise: cruise,
 		power:  power,
+		idle:   idle,
 	}
 }
 
@@ -106,10 +109,23 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	// 等待之前云台动作停止
 	time.Sleep(time.Millisecond * 50)
 
+	// 云台空闲动作检测协程
+	if trigger != ptz.Idle && function != ptz.None {
+		log.Info("pause idle")
+
+		b.idle.Pause()
+	}
+
 	// 转动云台
 	switch function {
+	case ptz.None:
+		log.Info("reset idle")
+
+		b.idle.Reset()
 	case ptz.Cruise:
-		b.cruise.Start(ctl, b.preset, dsd.CruiseID(funcID))
+		if err := b.cruise.Start(ctl, b.preset, dsd.CruiseID(funcID)); err != nil {
+			return err
+		}
 	case ptz.Trace:
 	case ptz.LineScan:
 		if err := b.line.Start(ctl, dsd.LineScanID(funcID)); err != nil {
@@ -147,11 +163,21 @@ func (b *Blp) validate(trigger ptz.Trigger, function ptz.Function, funcID, cronI
 }
 
 func (b *Blp) Version() string {
-	return b.state.Version()
+	version, err := b.getControl().Version()
+	if err != nil {
+		log.Error(err.Error())
+		version = ""
+	}
+	return version
 }
 
 func (b *Blp) Model() string {
-	return b.state.Version()
+	model, err := b.getControl().Model()
+	if err != nil {
+		log.Error(err.Error())
+		model = ""
+	}
+	return model
 }
 
 func (b *Blp) Restart() error {
@@ -168,6 +194,10 @@ func (b *Blp) getControl() control.ControlRepo {
 	ctl := b.serialCtl
 
 	return ctl
+}
+
+func (b *Blp) State() *dsd.Status {
+	return b.state.Convert()
 }
 
 // TODO delete

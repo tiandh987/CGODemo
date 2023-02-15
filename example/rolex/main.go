@@ -86,9 +86,15 @@ func main() {
 
 	// 查询云台状态
 	ptzGroup.GET("/status", func(c *gin.Context) {
-		// TODO
+		state := blp.Instance().State()
 
-		c.JSON(http.StatusOK, "status")
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      state,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
 	})
 
 	// 云台转动-单击
@@ -240,6 +246,7 @@ func main() {
 	lineRouter(engine)
 	cruiseRouter(engine)
 	powerRouter(engine)
+	idleRouter(engine)
 
 	engine.Run(":8089")
 
@@ -717,6 +724,96 @@ func powerRouter(engine *gin.Engine) {
 			Data:      nil,
 			Detail:    "",
 			Message:   "default power up success",
+			Translate: "",
+		})
+		return
+	})
+}
+
+func idleRouter(engine *gin.Engine) {
+	idleGroup := engine.Group("/v1/ptz/idlemotion")
+
+	// 获取空闲动作配置
+	idleGroup.GET("", func(c *gin.Context) {
+		idle, err := blp.Instance().GetIdle()
+		if err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      idle,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 空闲动作恢复默认配置
+	idleGroup.PUT("", func(c *gin.Context) {
+		err := blp.Instance().DefaultIdle()
+		if err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "default idle success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 空闲动作开始和停止
+	idleGroup.POST("", func(c *gin.Context) {
+		var motion dsd.IdleMotion
+
+		err := c.ShouldBind(&motion)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+			return
+		}
+
+		err = blp.Instance().SetIdle(&motion)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "set idle success",
 			Translate: "",
 		})
 		return

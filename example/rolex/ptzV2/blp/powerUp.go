@@ -28,7 +28,7 @@ func (b *Blp) StartPowerUp() error {
 	}
 
 	if !up.Enable {
-		log.Info("power up id disable")
+		log.Info("power up is disable")
 		return nil
 	}
 

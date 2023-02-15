@@ -15,7 +15,7 @@ type Trigger int
 // 返回 ture，表示 t 的优先级高于 trigger
 // 返回 false，表示 t 的优先级低于 trigger
 func (t Trigger) Compare(trigger Trigger) bool {
-	return t <= trigger
+	return t < trigger
 }
 
 const (
@@ -79,8 +79,6 @@ type State struct {
 	cronID     int      // 定时任务ID
 	startTime  int64    // 开始时间，单位：毫秒
 	limit      *Limit   // 云台限位
-	version    string   // 云台版本
-	model      string   // 云台型号
 }
 
 func NewState(limit *dsd.Limit) *State {
@@ -91,8 +89,6 @@ func NewState(limit *dsd.Limit) *State {
 		cronID:     0,
 		startTime:  0,
 		limit:      newLimit(limit),
-		version:    "",
-		model:      "",
 	}
 }
 
@@ -143,14 +139,28 @@ func (s *State) Change(trigger Trigger, function Function, funcID int, cronID in
 	return nil
 }
 
-func (s *State) Version() string {
-	return s.version
-}
-
-func (s *State) Model() string {
-	return s.model
-}
-
 func (s *State) Function() Function {
 	return s.function
+}
+
+func (s *State) Convert() *dsd.Status {
+	status := dsd.Status{
+		Moving:       false,
+		Trigger:      0,
+		Function:     0,
+		FunctionID:   0,
+		TimingTaskID: 0,
+		StartTime:    0,
+	}
+
+	if s.function != None {
+		status.Moving = true
+		status.Trigger = int(s.trigger)
+		status.Function = int(s.function)
+		status.FunctionID = s.functionID
+		status.StartTime = s.startTime
+		status.TimingTaskID = s.cronID
+	}
+
+	return &status
 }
