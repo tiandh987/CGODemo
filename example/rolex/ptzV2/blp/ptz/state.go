@@ -128,6 +128,11 @@ func (s *State) Change(trigger Trigger, function Function, funcID int, cronID in
 	log.Debugf("request param trigger: %d function: %d funcID: %d cronID: %d",
 		trigger, function, funcID, cronID)
 
+	if function == None {
+		funcID = 0
+		cronID = 0
+	}
+
 	s.trigger = trigger
 	s.function = function
 	s.functionID = funcID

@@ -5,6 +5,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/serial"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cron"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/idle"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
@@ -32,6 +33,7 @@ type Blp struct {
 	cruise    *cruise.Cruise
 	power     *powerUp.PowerUp
 	idle      *idle.Idle
+	cron      *cron.Cron
 }
 
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
@@ -73,19 +75,14 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 
 	log.Debugf("current state: %+v\n\n", b.state)
 
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if err := b.validate(trigger, function, funcID, cronID); err != nil {
 		return err
 	}
 
-	// 触发者为定时任务时，更新 function、funcID
-	if trigger == ptz.Cron {
-		//	TODO 更新 function、funcID
-	}
-
 	ctl := b.getControl()
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	// 停止当前云台正在运行的动作
 	switch b.state.Function() {
@@ -120,7 +117,6 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	switch function {
 	case ptz.None:
 		log.Info("reset idle")
-
 		b.idle.Reset()
 	case ptz.Cruise:
 		if err := b.cruise.Start(ctl, b.preset, dsd.CruiseID(funcID)); err != nil {
@@ -148,6 +144,14 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 	}
 
 	return nil
+}
+
+func (b *Blp) getControl() control.ControlRepo {
+	// TODO 判断使用 serial 还是 media 进行通信
+
+	ctl := b.serialCtl
+
+	return ctl
 }
 
 func (b *Blp) validate(trigger ptz.Trigger, function ptz.Function, funcID, cronID int) error {
@@ -181,19 +185,9 @@ func (b *Blp) Model() string {
 }
 
 func (b *Blp) Restart() error {
-	ctl := b.serialCtl
-
-	// TODO ctl 选择
+	ctl := b.getControl()
 
 	return ctl.Restart()
-}
-
-func (b *Blp) getControl() control.ControlRepo {
-	// TODO 判断使用 serial 还是 media 进行通信
-
-	ctl := b.serialCtl
-
-	return ctl
 }
 
 func (b *Blp) State() *dsd.Status {
