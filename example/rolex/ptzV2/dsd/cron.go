@@ -66,7 +66,7 @@ func NewPtzAutoMovement(id CronID) (*PtzAutoMovement, error) {
 	}, nil
 }
 
-func (m *PtzAutoMovement) Default() []PtzAutoMovement {
+func (m *PtzAutoMovement) DefaultSlice() []PtzAutoMovement {
 	movements := make([]PtzAutoMovement, MaxCronNum)
 
 	for id := 1; id <= MaxCronNum; id++ {

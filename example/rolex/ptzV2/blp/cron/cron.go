@@ -53,10 +53,11 @@ type ScheduleInfo struct {
 
 func New(movements []dsd.PtzAutoMovement) (*Cron, error) {
 	cron := &Cron{
-		crontab: cron.New(cron.WithSeconds()),
-		infos:   make([][]ScheduleInfo, 7),
-		infoCh:  make(chan ScheduleInfo, 1),
-		quitCh:  make(chan struct{}, 1),
+		movements: movements,
+		crontab:   cron.New(cron.WithSeconds()),
+		infos:     make([][]ScheduleInfo, 7),
+		infoCh:    make(chan ScheduleInfo, 1),
+		quitCh:    make(chan struct{}, 1),
 	}
 
 	if err := cron.convert(movements); err != nil {
@@ -90,12 +91,14 @@ func (c *Cron) Set(movement *dsd.PtzAutoMovement) error {
 		}
 	}
 
-	cron := &Cron{}
+	cron := &Cron{
+		infos: make([][]ScheduleInfo, 7),
+	}
 	if err := cron.convert(movements); err != nil {
 		return err
 	}
 
-	c.movements = cron.movements
+	c.movements = movements
 	c.infos = cron.infos
 
 	return nil
@@ -134,9 +137,9 @@ func (c *Cron) Run() {
 	weekdayInfo := c.infos[weekday]
 
 	now := time.Now()
-	if now.Before(weekdayInfo[0].start) || now.After(weekdayInfo[len(weekdayInfo)-1].end) {
-		return
-	}
+	//if now.Before(weekdayInfo[0].start) || now.After(weekdayInfo[len(weekdayInfo)-1].end) {
+	//	return
+	//}
 
 	for index, info := range weekdayInfo {
 		if now.After(info.start) && now.Before(info.end) {

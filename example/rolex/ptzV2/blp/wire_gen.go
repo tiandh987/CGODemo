@@ -8,28 +8,34 @@ package blp
 
 import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/serial"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cron"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/idle"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/trace"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
 )
 
 // Injectors from wire.go:
 
 func New(limit *dsd.Limit, comName string, comCfg *dsd.PTZ, ps []dsd.PresetPoint, ls []dsd.LineScan, cs []dsd.TourPreset,
-	ups *dsd.PowerUps, motion *dsd.IdleMotion) *Blp {
+	ups *dsd.PowerUps, motion *dsd.IdleMotion, m []dsd.PtzAutoMovement, records []trace.Record) *Blp {
 
 	state := ptz.NewState(limit)
 	serialSerial := serial.New(comName, comCfg)
-	basic := New()
 	presetPreset := preset.New(ps)
 	lineScanLineScan := lineScan.New(ls)
 	cruiseCruise := cruise.New(cs)
 	up := powerUp.New(ups)
 	i := idle.New(motion)
-	blp := NewBlp(state, serialSerial, basic, presetPreset, lineScanLineScan, cruiseCruise, up, i)
+	c, err := cron.New(m)
+	if err != nil {
+		panic(err)
+	}
+	t := trace.New(records)
+	blp := NewBlp(state, serialSerial, presetPreset, lineScanLineScan, cruiseCruise, up, i, c, t)
 	return blp
 }

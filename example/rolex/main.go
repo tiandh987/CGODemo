@@ -115,7 +115,7 @@ func main() {
 			return
 		}
 
-		if err := ptz.Operation(dirNum).ValidateDirection(); err != nil {
+		if err := blp.Operation(dirNum).ValidateDirection(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -166,7 +166,7 @@ func main() {
 			return
 		}
 
-		if err := ptz.Operation(dirNum).ValidateDirection(); err != nil {
+		if err := blp.Operation(dirNum).ValidateDirection(); err != nil {
 			log.Error(err.Error())
 
 			c.JSON(http.StatusBadRequest, err)
@@ -200,7 +200,7 @@ func main() {
 			return
 		}
 
-		if err := ptz.Operation(methodNum).ValidateOperation(); err != nil {
+		if err := blp.Operation(methodNum).ValidateOperation(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -247,6 +247,7 @@ func main() {
 	cruiseRouter(engine)
 	powerRouter(engine)
 	idleRouter(engine)
+	cronRouter(engine)
 
 	engine.Run(":8089")
 
@@ -814,6 +815,87 @@ func idleRouter(engine *gin.Engine) {
 			Data:      "",
 			Detail:    "",
 			Message:   "set idle success",
+			Translate: "",
+		})
+		return
+	})
+}
+
+func cronRouter(engine *gin.Engine) {
+	cronGroup := engine.Group("/v1/ptz/autoMovement")
+
+	// 获取定时任务
+	cronGroup.GET("", func(c *gin.Context) {
+		cron := blp.Instance().ListCron()
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      cron,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 云台定时任务恢复默认配置
+	cronGroup.PUT("", func(c *gin.Context) {
+		err := blp.Instance().DefaultCron()
+		if err != nil {
+			c.JSON(200, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "default cron success",
+			Translate: "",
+		})
+		return
+	})
+
+	// 设置定时任务
+	cronGroup.POST("", func(c *gin.Context) {
+		var movement dsd.PtzAutoMovement
+
+		err := c.ShouldBind(&movement)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+			return
+		}
+
+		err = blp.Instance().SetCron(&movement)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "",
+			Detail:    "",
+			Message:   "set cron success",
 			Translate: "",
 		})
 		return

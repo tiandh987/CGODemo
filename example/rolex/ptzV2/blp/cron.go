@@ -19,7 +19,7 @@ func (b *Blp) SetCron(movement *dsd.PtzAutoMovement) error {
 	return b.cron.Set(movement)
 }
 
-func (b *Blp) startCron() {
+func (b *Blp) StartCron() {
 	b.cron.Start()
 
 	go func() {
@@ -42,6 +42,7 @@ func (b *Blp) startCron() {
 					function = ptz.RegionScan
 				}
 
+				log.Infof("start cron id: %d function: %d, funcID: %d", info.CronID, function, info.FuncID)
 				if err := b.Control(ptz.Cron, function, info.FuncID, info.CronID, ptz.SpeedOne); err != nil {
 					log.Errorf(err.Error())
 				}

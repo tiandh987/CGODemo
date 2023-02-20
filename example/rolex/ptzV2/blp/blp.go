@@ -11,6 +11,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/trace"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
 	"sync"
 	"time"
@@ -32,13 +33,15 @@ type Blp struct {
 	power     *powerUp.PowerUp
 	idle      *idle.Idle
 	cron      *cron.Cron
+	trace     *trace.Trace
 }
 
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
 //	line *lineScan.LineScan) *Blp {
 
 func NewBlp(st *ptz.State, sCtl *serial.Serial, preset *preset.Preset,
-	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp, idle *idle.Idle) *Blp {
+	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp, idle *idle.Idle, cron *cron.Cron,
+	trace *trace.Trace) *Blp {
 
 	return &Blp{
 		state:     st,
@@ -49,6 +52,8 @@ func NewBlp(st *ptz.State, sCtl *serial.Serial, preset *preset.Preset,
 		cruise: cruise,
 		power:  power,
 		idle:   idle,
+		cron:   cron,
+		trace:  trace,
 	}
 }
 

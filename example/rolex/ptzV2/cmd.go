@@ -45,7 +45,7 @@ func Start() error {
 		return err
 	}
 
-	// 巡迹
+	// 巡航
 	cruise := dsd.TourPreset{}
 	cruises := cruise.Default()
 	if err := config.SetDefault(cruise.ConfigKey(), cruises); err != nil {
@@ -54,6 +54,16 @@ func Start() error {
 	if err := config.GetConfig(cruise.ConfigKey(), &cruises); err != nil {
 		return err
 	}
+
+	//// 巡迹
+	//pattern := dsd.Pattern{}
+	//cruises := pattern.Default()
+	//if err := config.SetDefault(cruise.ConfigKey(), cruises); err != nil {
+	//	return err
+	//}
+	//if err := config.GetConfig(cruise.ConfigKey(), &cruises); err != nil {
+	//	return err
+	//}
 
 	// 开机动作
 	ups := dsd.NewPowerUps()
@@ -73,11 +83,22 @@ func Start() error {
 		return err
 	}
 
-	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises, ups, motion)
+	// 定时任务
+	movement := &dsd.PtzAutoMovement{}
+	movements := movement.DefaultSlice()
+	if err := config.SetDefault(movement.ConfigKey(), movements); err != nil {
+		return err
+	}
+	if err := config.GetConfig(movement.ConfigKey(), &movements); err != nil {
+		return err
+	}
+
+	blpInstance := blp.New(limit, "", ptz, presets, lines, cruises, ups, motion, movements, nil)
 	blp.Replace(blpInstance)
 
 	blp.Instance().StartPowerUp()
 	blp.Instance().StartIdle()
+	blp.Instance().StartCron()
 
 	return nil
 }

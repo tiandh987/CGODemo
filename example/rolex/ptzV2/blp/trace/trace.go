@@ -5,6 +5,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
+	"sort"
 	"sync"
 	"time"
 )
@@ -26,6 +27,23 @@ type Trace struct {
 	infoCh chan ScheduleInfo
 	stopCh chan struct{}
 	quitCh chan struct{}
+}
+
+func New(records []Record) *Trace {
+	return &Trace{
+		records: records,
+		runState: &runState{
+			recordID: 0,
+			state:    none,
+			index:    0,
+			maxIndex: 0,
+			timer:    time.NewTimer(time.Second),
+		},
+		tmpRecord: Record{},
+		infoCh:    make(chan ScheduleInfo, 1),
+		stopCh:    make(chan struct{}, 1),
+		quitCh:    make(chan struct{}, 1),
+	}
 }
 
 type runState struct {
@@ -54,6 +72,13 @@ type ScheduleInfo struct {
 	duration  time.Duration
 }
 
+func (t *Trace) List() []Record {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.records
+}
+
 func (t *Trace) StartRecord(id dsd.TraceID, pos *dsd.Position) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -65,11 +90,12 @@ func (t *Trace) StartRecord(id dsd.TraceID, pos *dsd.Position) error {
 	t.runState.recordID = id
 	t.runState.state = recording
 	t.tmpRecord = Record{
-		ID:     id,
-		Enable: true,
-		Valid:  false,
-		Infos:  []ScheduleInfo{},
-		Start:  *pos,
+		ID:        id,
+		Enable:    true,
+		Valid:     false,
+		Infos:     []ScheduleInfo{},
+		Start:     *pos,
+		StartTime: time.Now(),
 	}
 
 	return nil
@@ -87,9 +113,22 @@ func (t *Trace) StopRecord(id dsd.TraceID, pos *dsd.Position) {
 		return
 	}
 
-	t.tmpRecord.End = *pos
 	t.tmpRecord.Valid = true
+	t.tmpRecord.End = *pos
+	t.tmpRecord.EndTime = time.Now()
 
+	sort.Slice(t.tmpRecord, func(i, j int) bool {
+		return t.tmpRecord.Infos[i].StartTime.Sub(t.tmpRecord.Infos[j].StartTime) < 0
+	})
+
+	for i := 0; i < len(t.tmpRecord.Infos); i++ {
+		if i == len(t.tmpRecord.Infos)-1 {
+			t.tmpRecord.Infos[i].duration = t.tmpRecord.EndTime.Sub(t.tmpRecord.Infos[i].StartTime)
+			continue
+		}
+
+		t.tmpRecord.Infos[i].duration = t.tmpRecord.Infos[i+1].StartTime.Sub(t.tmpRecord.Infos[i].StartTime)
+	}
 	t.records[id-1] = t.tmpRecord
 
 	return
@@ -136,27 +175,16 @@ func (t *Trace) Start(ctl control.ControlRepo, id dsd.TraceID) {
 
 			if t.runState.index == t.runState.maxIndex {
 				ctl.Goto(&record.End)
-				time.Sleep(record.Infos[t.runState.index].StartTime.Sub(record.StartTime) * time.Second)
+				t.runState.timer.Reset(time.Second * 3)
+				t.runState.index = 0
+				continue
 			}
 
 			t.infoCh <- record.Infos[t.runState.index]
 			t.runState.timer.Reset(time.Second * record.Infos[t.runState.index].duration)
 			t.runState.index++
-
-			if t.runState.index+1 < t.runState.index {
-				ctl.Goto(&record.Start)
-				time.Sleep(time.Millisecond * 100)
-			}
-
-			info := record.Infos[t.runState.index]
-			t.infoCh <- info
-
-			if t.runState.index+1 == t.runState.maxIndex {
-
-			}
 		}
 	}
-
 }
 
 func (t *Trace) Quit() {
@@ -166,4 +194,8 @@ func (t *Trace) Quit() {
 	if t.runState.state != none {
 		t.quitCh <- struct{}{}
 	}
+}
+
+func (t *Trace) InfoCh() <-chan ScheduleInfo {
+	return t.infoCh
 }
