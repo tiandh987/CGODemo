@@ -37,7 +37,7 @@ type PtzAutoMovement struct {
 
 type AutoHoming struct {
 	Enable bool `json:"Enable" validate:"boolean"`
-	Time   int  `json:"RegionScanID" validate:"required,gte=3"`
+	Time   int  `json:"Time" validate:"required,gte=3"`
 }
 
 func NewPtzAutoMovement(id CronID) (*PtzAutoMovement, error) {

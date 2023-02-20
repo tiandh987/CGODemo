@@ -8,7 +8,6 @@ package blp
 
 import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/serial"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/idle"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/lineScan"
@@ -25,7 +24,7 @@ func New(limit *dsd.Limit, comName string, comCfg *dsd.PTZ, ps []dsd.PresetPoint
 
 	state := ptz.NewState(limit)
 	serialSerial := serial.New(comName, comCfg)
-	basic := basic.New()
+	basic := New()
 	presetPreset := preset.New(ps)
 	lineScanLineScan := lineScan.New(ls)
 	cruiseCruise := cruise.New(cs)

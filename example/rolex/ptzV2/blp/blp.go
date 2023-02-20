@@ -3,7 +3,6 @@ package blp
 import (
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/serial"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cron"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/cruise"
@@ -27,7 +26,6 @@ type Blp struct {
 	state     *ptz.State
 	serialCtl control.ControlRepo
 	mediaCtl  control.ControlRepo
-	basic     *basic.Basic
 	preset    *preset.Preset
 	line      *lineScan.LineScan
 	cruise    *cruise.Cruise
@@ -39,14 +37,13 @@ type Blp struct {
 //func NewBlp(st *ptz.State, sCtl *serial.Serial, mCtl control.ControlRepo, basic *ptz.Basic, preset *preset.Preset,
 //	line *lineScan.LineScan) *Blp {
 
-func NewBlp(st *ptz.State, sCtl *serial.Serial, basic *basic.Basic, preset *preset.Preset,
+func NewBlp(st *ptz.State, sCtl *serial.Serial, preset *preset.Preset,
 	line *lineScan.LineScan, cruise *cruise.Cruise, power *powerUp.PowerUp, idle *idle.Idle) *Blp {
 
 	return &Blp{
 		state:     st,
 		serialCtl: sCtl,
 		//mediaCtl:  mCtl,
-		basic:  basic,
 		preset: preset,
 		line:   line,
 		cruise: cruise,
@@ -134,7 +131,7 @@ func (b *Blp) Control(trigger ptz.Trigger, function ptz.Function, funcID, cronID
 			return err
 		}
 	case ptz.ManualFunc:
-		if err := b.basic.Start(ctl, funcID, speed); err != nil {
+		if err := b.turn(funcID, speed); err != nil {
 			return err
 		}
 	}

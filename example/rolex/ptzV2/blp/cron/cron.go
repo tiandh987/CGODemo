@@ -159,12 +159,12 @@ func (c *Cron) convert(movements []dsd.PtzAutoMovement) error {
 			for i, s := range sections.Section {
 				start, err := parseTimeStr(s.TimeStr[0])
 				if err != nil {
-					return errors.New(fmt.Sprintf("cron id[%d] weekday [%d] section[%d %s] parse start failed", movement.ID, weekday, i))
+					return errors.New(fmt.Sprintf("cron id[%d] weekday [%d] section[%d] parse start failed", movement.ID, weekday, i))
 				}
 
 				end, err := parseTimeStr(s.TimeStr[1])
 				if err != nil {
-					return errors.New(fmt.Sprintf("cron id[%d] weekday [%d] section[%d %s] parse end failed", movement.ID, weekday, i))
+					return errors.New(fmt.Sprintf("cron id[%d] weekday [%d] section[%d] parse end failed", movement.ID, weekday, i))
 				}
 
 				if start.After(end) {
@@ -189,13 +189,18 @@ func (c *Cron) convert(movements []dsd.PtzAutoMovement) error {
 					return errors.New("invalid cron function")
 				}
 
+				homing := movement.AutoHoming.Time
+				if homing < 3 {
+					homing = 3
+				}
+
 				info := ScheduleInfo{
 					CronID:     int(movement.ID),
 					Function:   Function(movement.Function),
 					FuncID:     funcID,
 					start:      start,
 					end:        end,
-					autoHoming: time.Duration(movement.AutoHoming.Time),
+					autoHoming: time.Duration(homing),
 				}
 
 				c.infos[weekday] = append(c.infos[weekday], info)
@@ -210,13 +215,33 @@ func (c *Cron) convert(movements []dsd.PtzAutoMovement) error {
 
 		for i := 0; i < len(info)-1; i++ {
 			if info[i].end.After(info[i+1].start) {
-				log.Errorf("invalid schedule section.\n%+v\n%+v", info[i], info[i+1])
-				return errors.New(fmt.Sprintf("invalid schedule section, id[%d %d] weekday[%d]", info[i].CronID, info[i+1].CronID, weekday))
+				log.Errorf("invalid schedule section (weekday:%d)\n"+
+					"CronID:%d Function:%d FuncID:%d start:%s end:%s\n"+
+					"CronID:%d Function:%d FuncID:%d start:%s end:%s\n",
+					weekday,
+					info[i].CronID, info[i].Function, info[i].FuncID, info[i].start.Format("15:04:05"),
+					info[i].end.Format("15:04:05"),
+					info[i+1].CronID, info[i+1].Function, info[i+1].FuncID, info[i+1].start.Format("15:04:05"),
+					info[i+1].end.Format("15:04:05"))
+
+				return errors.New(fmt.Sprintf("invalid schedule section"))
 			}
 		}
 	}
 
+	c.printScheduleInfo()
+
 	return nil
+}
+
+func (c *Cron) printScheduleInfo() {
+	for weekday, info := range c.infos {
+		log.Infof("[weekday:%d]\n", weekday)
+		for _, i := range info {
+			log.Infof("CronID:%d Function:%d FuncID:%d start:%s end:%s homing:%d\n", i.CronID, i.Function,
+				i.FuncID, i.start.Format("15:04:05"), i.end.Format("15:04:05"), i.autoHoming)
+		}
+	}
 }
 
 func parseTimeStr(str string) (time.Time, error) {
