@@ -3,9 +3,9 @@ package serial
 import (
 	"errors"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol/pelcod"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/arch/protocol"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/arch/protocol/pelcod"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 	goSerial "go.bug.st/serial"
 	"sync"
 	"time"

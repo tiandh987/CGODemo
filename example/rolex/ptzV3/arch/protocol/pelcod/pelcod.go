@@ -2,7 +2,7 @@ package pelcod
 
 import (
 	"errors"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/arch/protocol"
 )
 
 const (

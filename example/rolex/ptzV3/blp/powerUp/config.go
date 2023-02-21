@@ -3,45 +3,8 @@ package powerUp
 import (
 	"errors"
 	"github.com/tiandh987/CGODemo/example/rolex/config"
-	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 )
-
-// Function 开机功能
-type Function int
-
-const (
-	None       Function = iota // 自动
-	Preset                     // 预置点
-	Cruise                     // 巡航
-	Trace                      // 巡迹
-	LineScan                   // 线性扫描
-	RegionScan                 // 区域扫描
-)
-
-func (f Function) Validate() error {
-	if f < None || f > RegionScan {
-		return errors.New("invalid power up function")
-	}
-
-	return nil
-}
-
-type PowerUp struct {
-	enable   bool
-	function Function
-	funcID   int
-}
-
-func New(ups *dsd.PowerUps) *PowerUp {
-	up := &PowerUp{}
-
-	if err := up.convert(ups); err != nil {
-		log.Panic(err.Error())
-	}
-
-	return up
-}
 
 func (u *PowerUp) Set(ups *dsd.PowerUps) error {
 	if err := u.convert(ups); err != nil {
@@ -55,7 +18,7 @@ func (u *PowerUp) Set(ups *dsd.PowerUps) error {
 	return nil
 }
 
-func (u *PowerUp) Get() (*dsd.PowerUps, error) {
+func (u *PowerUp) Get() *dsd.PowerUps {
 	ups := dsd.NewPowerUps()
 	ups.Enable = u.enable
 	ups.Function = int(u.function)
@@ -73,7 +36,7 @@ func (u *PowerUp) Get() (*dsd.PowerUps, error) {
 		ups.RegionScanID = u.funcID
 	}
 
-	return ups, nil
+	return ups
 }
 
 func (u *PowerUp) Default() error {
@@ -94,7 +57,7 @@ func (u *PowerUp) convert(ups *dsd.PowerUps) error {
 
 	switch Function(ups.Function) {
 	case None:
-		// nothing to do
+		funcID = 1
 	case Preset:
 		if err := dsd.PresetID(ups.PresetID).Validate(); err != nil {
 			return err
@@ -106,9 +69,9 @@ func (u *PowerUp) convert(ups *dsd.PowerUps) error {
 		}
 		funcID = ups.TourID
 	case Trace:
-		//if err := dsd.Trace(ups.PresetID).Validate(); err != nil {
-		//	return err
-		//}
+		if err := dsd.TraceID(ups.PatternID).Validate(); err != nil {
+			return err
+		}
 	case LineScan:
 		if err := dsd.LineScanID(ups.LinearScanID).Validate(); err != nil {
 			return err

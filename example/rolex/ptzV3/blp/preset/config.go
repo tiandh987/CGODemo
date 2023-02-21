@@ -5,7 +5,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 )
 
-func (p *Preset) List() []dsd.PresetPoint {
+func (p *Preset) List() dsd.PresetSlice {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -16,12 +16,13 @@ func (p *Preset) Update(id dsd.PresetID, name string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	before := p.presets[id-1]
-
 	preset := dsd.NewPreset(id, name)
 	if err := preset.Validate(); err != nil {
 		return err
 	}
+
+	before := p.presets[id-1]
+
 	preset.Enable = before.Enable
 	preset.Position = before.Position
 

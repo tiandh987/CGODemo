@@ -1,6 +1,7 @@
 package preset
 
 import (
+	"context"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
@@ -21,7 +22,7 @@ func New(basic *basic.Basic, presets dsd.PresetSlice) *Preset {
 	}
 }
 
-func (p *Preset) Start(id dsd.PresetID) error {
+func (p *Preset) Start(ctx context.Context, id dsd.PresetID) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -33,6 +34,19 @@ func (p *Preset) Start(id dsd.PresetID) error {
 	}
 
 	if err := p.basic.Goto(&preset.Position); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Preset) ReachPreset(ctx context.Context, id dsd.PresetID) error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	preset := p.presets[id-1]
+
+	if err := p.basic.ReachPosition(ctx, &preset.Position); err != nil {
 		return err
 	}
 

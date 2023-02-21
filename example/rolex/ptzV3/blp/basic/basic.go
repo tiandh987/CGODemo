@@ -1,9 +1,11 @@
 package basic
 
 import (
+	"context"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
+	"time"
 )
 
 type Basic struct {
@@ -14,10 +16,10 @@ func New(repo ptz.AbilityRepo) *Basic {
 	return &Basic{ar: repo}
 }
 
-func (b *Basic) Operation(id int, speed ptz.Speed) error {
+func (b *Basic) Operation(id Operation, speed ptz.Speed) error {
 	log.Infof("id: %d, speed: %d", id, speed)
 
-	switch Operation(id) {
+	switch id {
 	case DirectionUp:
 		return b.ar.Up(speed)
 	case DirectionDown:
@@ -89,4 +91,26 @@ func (b *Basic) Position() (*dsd.Position, error) {
 
 func (b *Basic) Goto(pos *dsd.Position) error {
 	return b.ar.Goto(pos)
+}
+
+func (b *Basic) ReachPosition(ctx context.Context, dst *dsd.Position) error {
+	ticker := time.NewTicker(time.Millisecond * 10)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			pos, err := b.Position()
+			if err != nil {
+				return err
+			}
+
+			if pos.Pan >= dst.Pan-2 && pos.Pan <= dst.Pan+2 &&
+				pos.Tilt >= dst.Tilt-2 && pos.Tilt <= dst.Tilt+2 &&
+				pos.Zoom >= dst.Zoom-2 && pos.Zoom <= dst.Zoom+2 {
+				b.Stop()
+				return nil
+			}
+		}
+	}
 }

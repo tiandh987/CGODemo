@@ -4,12 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/arch/protocol"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/control"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/arch/protocol"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 )
 
-var _ control.ControlRepo = (*Serial)(nil)
+var _ ptz.AbilityRepo = (*Serial)(nil)
 
 func (s *Serial) Version() (string, error) {
 	ver, err := s.Send(protocol.Version, protocol.VersionReplay, 0x00, 0x00)
@@ -51,64 +51,64 @@ func (s *Serial) Stop() error {
 	return nil
 }
 
-func (s *Serial) Up(speed byte) error {
-	if _, err := s.Send(protocol.Up, protocol.NoneReplay, 0x00, speed); err != nil {
+func (s *Serial) Up(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.Up, protocol.NoneReplay, 0x00, speed.Convert()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) Down(speed byte) error {
-	if _, err := s.Send(protocol.Down, protocol.NoneReplay, 0x00, speed); err != nil {
+func (s *Serial) Down(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.Down, protocol.NoneReplay, 0x00, speed.Convert()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) Left(speed byte) error {
-	if _, err := s.Send(protocol.Left, protocol.NoneReplay, speed, 0x00); err != nil {
+func (s *Serial) Left(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.Left, protocol.NoneReplay, speed.Convert(), 0x00); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) Right(speed byte) error {
-	if _, err := s.Send(protocol.Right, protocol.NoneReplay, speed, 0x00); err != nil {
+func (s *Serial) Right(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.Right, protocol.NoneReplay, speed.Convert(), 0x00); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) LeftUp(speed byte) error {
-	if _, err := s.Send(protocol.LeftUp, protocol.NoneReplay, speed, speed); err != nil {
+func (s *Serial) LeftUp(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.LeftUp, protocol.NoneReplay, speed.Convert(), speed.Convert()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) RightUp(speed byte) error {
-	if _, err := s.Send(protocol.RightUp, protocol.NoneReplay, speed, speed); err != nil {
+func (s *Serial) RightUp(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.RightUp, protocol.NoneReplay, speed.Convert(), speed.Convert()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) LeftDown(speed byte) error {
-	if _, err := s.Send(protocol.LeftDown, protocol.NoneReplay, speed, speed); err != nil {
+func (s *Serial) LeftDown(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.LeftDown, protocol.NoneReplay, speed.Convert(), speed.Convert()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Serial) RightDown(speed byte) error {
-	if _, err := s.Send(protocol.RightDown, protocol.NoneReplay, speed, speed); err != nil {
+func (s *Serial) RightDown(speed ptz.Speed) error {
+	if _, err := s.Send(protocol.RightDown, protocol.NoneReplay, speed.Convert(), speed.Convert()); err != nil {
 		return err
 	}
 
