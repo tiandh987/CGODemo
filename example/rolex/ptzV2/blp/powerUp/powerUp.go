@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/tiandh987/CGODemo/example/rolex/config"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
 )
 
 // Function 开机功能

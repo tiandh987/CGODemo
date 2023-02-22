@@ -39,6 +39,14 @@ func (u *PowerUp) Get() *dsd.PowerUps {
 	return ups
 }
 
+func (u *PowerUp) Enable() bool {
+	return u.enable
+}
+
+func (u *PowerUp) GetFuncAndId() (Function, int) {
+	return u.function, u.funcID
+}
+
 func (u *PowerUp) Default() error {
 	u.enable = false
 	u.function = None

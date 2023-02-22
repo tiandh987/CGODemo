@@ -2,6 +2,8 @@ package cruise
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/looplab/fsm"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/preset"
@@ -67,16 +69,20 @@ func New(preset *preset.Preset, cruises dsd.CruiseSlice) *Cruise {
 	return c
 }
 
-func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) {
+func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) error {
+	if err := id.Validate(); err != nil {
+		return err
+	}
+
 	if c.fsm.Current() != none {
 		log.Warnf("cruise is running")
-		return
+		return errors.New("cruise is running")
 	}
 
 	cruise := c.cruises[id-1]
 	if !cruise.Enable {
 		log.Warnf("cruise (%d - %s) is disable", id, cruise.Name)
-		return
+		return fmt.Errorf("cruise (%d - %s) is disable", id, cruise.Name)
 	}
 
 	c.initIndex(id)
@@ -84,7 +90,7 @@ func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) {
 	event := jumping
 	if !c.fsm.Can(event) {
 		log.Warnf("line scan can not convert to %s", event)
-		return
+		return fmt.Errorf("line scan can not convert to %s", event)
 	}
 
 	log.Infof("event: %s id: %d index : %d maxIndex: %d", event, id, c.index, c.maxIndex)
@@ -92,15 +98,26 @@ func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) {
 	go c.fsm.Event(ctx, event, id)
 
 	c.cruises[id-1].Running = true
+
+	return nil
 }
 
-func (c *Cruise) Stop(ctx context.Context, id dsd.CruiseID) {
-	if c.fsm.Current() == none || !c.cruises[id-1].Running {
-		return
+func (c *Cruise) Stop(ctx context.Context, id dsd.CruiseID) error {
+	if err := id.Validate(); err != nil {
+		return err
 	}
 
-	c.fsm.Event(ctx, none)
+	if c.fsm.Current() == none || !c.cruises[id-1].Running {
+		return nil
+	}
+
+	if err := c.fsm.Event(ctx, none); err != nil {
+		return err
+	}
+
 	c.cruises[id-1].Running = false
+
+	return nil
 }
 
 func (c *Cruise) initIndex(id dsd.CruiseID) {

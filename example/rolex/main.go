@@ -1,15 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/pflag"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/config"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	pkgVersion "github.com/tiandh987/CGODemo/example/rolex/pkg/version"
-	ptzV2 "github.com/tiandh987/CGODemo/example/rolex/ptzV2"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/blp/ptz"
-	"github.com/tiandh987/CGODemo/example/rolex/ptzV2/dsd"
+	ptzV3 "github.com/tiandh987/CGODemo/example/rolex/ptzV3"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/basic"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 	"net/http"
 	"strconv"
 	"time"
@@ -53,9 +55,11 @@ func main() {
 
 	engine := gin.Default()
 
-	if err := ptzV2.Start(); err != nil {
+	if err := ptzV3.Start(); err != nil {
 		panic(err)
 	}
+
+	blpInstance := ptzV3.Instance()
 
 	tokenGroup := engine.Group("/v1/token")
 	tokenGroup.POST("", func(c *gin.Context) {
@@ -72,21 +76,21 @@ func main() {
 
 	// 查询云台版本
 	ptzGroup.GET("/ptzversion", func(c *gin.Context) {
-		version := blp.Instance().Version()
+		version := blpInstance.Basic().Version()
 
 		c.JSON(http.StatusOK, version)
 	})
 
 	// 查询云台型号
 	ptzGroup.GET("/ptzmodel", func(c *gin.Context) {
-		model := blp.Instance().Model()
+		model := blpInstance.Basic().Model()
 
 		c.JSON(http.StatusOK, model)
 	})
 
 	// 查询云台状态
 	ptzGroup.GET("/status", func(c *gin.Context) {
-		state := blp.Instance().State()
+		state := blpInstance.Manager().State()
 
 		c.JSON(http.StatusOK, Response{
 			Code:      200,
@@ -115,7 +119,7 @@ func main() {
 			return
 		}
 
-		if err := blp.Operation(dirNum).ValidateDirection(); err != nil {
+		if err := basic.Operation(dirNum).ValidateDirection(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -125,7 +129,14 @@ func main() {
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.ManualFunc, dirNum, 0, ptz.Speed(speedNum)); err != nil {
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.ManualFunc,
+			ID:      dirNum,
+			Speed:   speedNum,
+		}
+
+		if err := blpInstance.Manager().Start(&req); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -133,7 +144,13 @@ func main() {
 		time.Sleep(time.Millisecond * 200)
 		//time.Sleep(time.Second * 5)
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+		req2 := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.None,
+			ID:      dirNum,
+			Speed:   speedNum,
+		}
+		if err := blpInstance.Manager().Stop(&req2); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -166,7 +183,7 @@ func main() {
 			return
 		}
 
-		if err := blp.Operation(dirNum).ValidateDirection(); err != nil {
+		if err := basic.Operation(dirNum).ValidateDirection(); err != nil {
 			log.Error(err.Error())
 
 			c.JSON(http.StatusBadRequest, err)
@@ -180,7 +197,14 @@ func main() {
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.ManualFunc, dirNum, 0, ptz.Speed(speedNum)); err != nil {
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.ManualFunc,
+			ID:      dirNum,
+			Speed:   speedNum,
+		}
+
+		if err := blpInstance.Manager().Start(&req); err != nil {
 			log.Error(err.Error())
 			c.JSON(http.StatusBadRequest, err)
 			return
@@ -200,12 +224,19 @@ func main() {
 			return
 		}
 
-		if err := blp.Operation(methodNum).ValidateOperation(); err != nil {
+		if err := basic.Operation(methodNum).ValidateOperation(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.ManualFunc, methodNum, 0, 0); err != nil {
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.ManualFunc,
+			ID:      methodNum,
+			Speed:   1,
+		}
+
+		if err := blpInstance.Manager().Start(&req); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -216,7 +247,14 @@ func main() {
 
 	// 云台停止转动
 	ptzGroup.PUT("/stop", func(c *gin.Context) {
-		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.None,
+			ID:      0,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Stop(&req); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -233,7 +271,7 @@ func main() {
 			c.JSON(401, gin.H{"status": "bind error"})
 		}
 
-		if err := blp.Instance().Position(&pos); err != nil {
+		if err := blpInstance.Basic().Goto(&pos); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -254,11 +292,13 @@ func main() {
 }
 
 func presetRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	presetGroup := engine.Group("/v1/ptz/preset")
 
 	// 获取所有预置点
 	presetGroup.GET("/getpresets", func(c *gin.Context) {
-		list := blp.Instance().ListPreset()
+		list := blpInstance.Preset().List()
 
 		c.JSON(http.StatusOK, Response{
 			Code:      200,
@@ -280,7 +320,14 @@ func presetRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.Preset, idNum, 0, 0); err != nil {
+		req := &blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.Preset,
+			ID:      idNum,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Start(req); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -301,7 +348,7 @@ func presetRouter(engine *gin.Engine) {
 
 		name := c.Query("name")
 
-		if err := blp.Instance().UpdatePreset(dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
+		if err := blpInstance.Preset().Update(dsd.PresetID(idNum), name); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -320,7 +367,7 @@ func presetRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().DeletePreset(dsd.PresetID(idNum)); err != nil {
+		if err := blpInstance.Preset().Delete(dsd.PresetID(idNum)); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -331,7 +378,7 @@ func presetRouter(engine *gin.Engine) {
 
 	// 删除全部预置点
 	presetGroup.DELETE("/removepresets", func(c *gin.Context) {
-		if err := blp.Instance().DeleteAllPreset(); err != nil {
+		if err := blpInstance.Preset().DeleteAll(); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -352,7 +399,7 @@ func presetRouter(engine *gin.Engine) {
 
 		name := c.Query("name")
 
-		if err := blp.Instance().SetPreset(dsd.PresetID(idNum), dsd.PresetName(name)); err != nil {
+		if err := blpInstance.Preset().Set(dsd.PresetID(idNum), name); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -363,12 +410,14 @@ func presetRouter(engine *gin.Engine) {
 }
 
 func lineRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	lineGroup := engine.Group("/v1/ptz/linearscan")
 
 	// 获取线性扫描配置
 	lineGroup.GET("", func(c *gin.Context) {
 
-		list := blp.Instance().ListLine()
+		list := blpInstance.Line().List()
 
 		c.JSON(200, Response{
 			Code:      200,
@@ -383,7 +432,7 @@ func lineRouter(engine *gin.Engine) {
 	// 获取线性扫描配置
 	lineGroup.PUT("", func(c *gin.Context) {
 
-		if err := blp.Instance().DefaultLine(); err != nil {
+		if err := blpInstance.Line().Default(); err != nil {
 			log.Error(err.Error())
 			return
 		}
@@ -416,7 +465,7 @@ func lineRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().SetLine(&line); err != nil {
+		if err := blpInstance.Line().Set(&line); err != nil {
 			log.Error(err.Error())
 			return
 		}
@@ -441,7 +490,14 @@ func lineRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.LineScan, idNum, 0, 0); err != nil {
+		req := &blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.LineScan,
+			ID:      idNum,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Start(req); err != nil {
 			log.Error(err.Error())
 			c.JSON(500, "line start failed")
 			return
@@ -453,7 +509,23 @@ func lineRouter(engine *gin.Engine) {
 
 	// 停止线扫
 	lineGroup.POST("/stop", func(c *gin.Context) {
-		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		req := &blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.LineScan,
+			ID:      idNum,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Stop(req); err != nil {
 			log.Error(err.Error())
 			c.JSON(500, "line start failed")
 			return
@@ -489,7 +561,23 @@ func lineRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().SetLineMargin(dsd.LineScanID(idNum), limitNum, clearBool); err != nil {
+		var op dsd.LineMarginOp
+
+		if clearBool && limitNum == 1 {
+			op = dsd.ClearLeftMargin
+		} else if clearBool && limitNum == 2 {
+			op = dsd.ClearRightMargin
+		} else if !clearBool && limitNum == 1 {
+			op = dsd.SetLeftMargin
+		} else if !clearBool && limitNum == 2 {
+			op = dsd.SetRightMargin
+		} else {
+			err := fmt.Sprintf("param is invalid. limit: %d, clear: %t", limitNum, clearBool)
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		if err := blpInstance.Line().SetMargin(dsd.LineScanID(idNum), op); err != nil {
 			c.JSON(200, Response{
 				Code:      400,
 				Data:      nil,
@@ -506,12 +594,14 @@ func lineRouter(engine *gin.Engine) {
 }
 
 func cruiseRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	cruiseGroup := engine.Group("/v1/ptz/tour")
 
 	// 获取巡航组配置
 	cruiseGroup.GET("/gettours", func(c *gin.Context) {
 
-		cruises := blp.Instance().ListCruise()
+		cruises := blpInstance.Cruise().List()
 
 		c.JSON(200, Response{
 			Code:      200,
@@ -526,7 +616,7 @@ func cruiseRouter(engine *gin.Engine) {
 	// 巡航组恢复默认配置
 	cruiseGroup.PUT("", func(c *gin.Context) {
 
-		if err := blp.Instance().DefaultCruise(); err != nil {
+		if err := blpInstance.Cruise().Default(); err != nil {
 			c.JSON(400, Response{
 				Code:      400,
 				Data:      "",
@@ -558,7 +648,7 @@ func cruiseRouter(engine *gin.Engine) {
 
 		name := c.Query("name")
 
-		if err := blp.Instance().UpdateCruise(dsd.CruiseID(idNum), dsd.CruiseName(name)); err != nil {
+		if err := blpInstance.Cruise().Update(dsd.CruiseID(idNum), name); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -577,7 +667,7 @@ func cruiseRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().DeleteCruise(dsd.CruiseID(idNum)); err != nil {
+		if err := blpInstance.Cruise().Delete(dsd.CruiseID(idNum)); err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
@@ -597,13 +687,13 @@ func cruiseRouter(engine *gin.Engine) {
 
 		log.Infof("cruise: %+v", cruise)
 
-		//if err := cruise.Validate(); err != nil {
-		//	log.Error(err.Error())
-		//	c.JSON(400, gin.H{"status": "bad param"})
-		//	return
-		//}
+		if err := cruise.Validate(); err != nil {
+			log.Error(err.Error())
+			c.JSON(400, gin.H{"status": "bad param"})
+			return
+		}
 
-		if err := blp.Instance().SetCruise(&cruise); err != nil {
+		if err := blpInstance.Cruise().Set(&cruise); err != nil {
 			log.Error(err.Error())
 			return
 		}
@@ -628,7 +718,14 @@ func cruiseRouter(engine *gin.Engine) {
 			return
 		}
 
-		if err := blp.Instance().Control(ptz.Manual, ptz.Cruise, idNum, 0, 0); err != nil {
+		req := &blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.Cruise,
+			ID:      idNum,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Start(req); err != nil {
 			log.Error(err.Error())
 			c.JSON(500, "cruise start failed")
 			return
@@ -640,9 +737,24 @@ func cruiseRouter(engine *gin.Engine) {
 
 	// 停止
 	cruiseGroup.PUT("/stoptour", func(c *gin.Context) {
-		if err := blp.Instance().Control(ptz.Manual, ptz.None, 0, 0, 0); err != nil {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+
+		req := &blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.None,
+			ID:      idNum,
+			Speed:   0,
+		}
+
+		if err := blpInstance.Manager().Stop(req); err != nil {
 			log.Error(err.Error())
-			c.JSON(500, "cruise start failed")
+			c.JSON(500, "cruise stop failed")
 			return
 		}
 
@@ -652,21 +764,14 @@ func cruiseRouter(engine *gin.Engine) {
 }
 
 func powerRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	powerGroup := engine.Group("/v1/ptz/powerUpAction")
 
 	// 获取开机动作
 	powerGroup.GET("", func(c *gin.Context) {
 
-		up, err := blp.Instance().GetPowerUp()
-		if err != nil {
-			c.JSON(200, Response{
-				Code:      400,
-				Data:      nil,
-				Detail:    err.Error(),
-				Message:   "",
-				Translate: "",
-			})
-		}
+		up := blpInstance.Power().Get()
 
 		c.JSON(200, Response{
 			Code:      200,
@@ -687,7 +792,7 @@ func powerRouter(engine *gin.Engine) {
 			c.JSON(401, gin.H{"status": "bind error"})
 		}
 
-		if err := blp.Instance().SetPowerUp(&ups); err != nil {
+		if err := blpInstance.Power().Set(&ups); err != nil {
 			c.JSON(200, Response{
 				Code:      400,
 				Data:      nil,
@@ -710,7 +815,7 @@ func powerRouter(engine *gin.Engine) {
 	// 开机动作恢复默认配置
 	powerGroup.PUT("/defaultconfig", func(c *gin.Context) {
 
-		if err := blp.Instance().DefaultPowerUp(); err != nil {
+		if err := blpInstance.Power().Default(); err != nil {
 			c.JSON(200, Response{
 				Code:      400,
 				Data:      nil,
@@ -732,20 +837,13 @@ func powerRouter(engine *gin.Engine) {
 }
 
 func idleRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	idleGroup := engine.Group("/v1/ptz/idlemotion")
 
 	// 获取空闲动作配置
 	idleGroup.GET("", func(c *gin.Context) {
-		idle, err := blp.Instance().GetIdle()
-		if err != nil {
-			c.JSON(200, Response{
-				Code:      400,
-				Data:      nil,
-				Detail:    "",
-				Message:   err.Error(),
-				Translate: "",
-			})
-		}
+		idle := blpInstance.Idle().Get()
 
 		c.JSON(http.StatusOK, Response{
 			Code:      200,
@@ -759,7 +857,7 @@ func idleRouter(engine *gin.Engine) {
 
 	// 空闲动作恢复默认配置
 	idleGroup.PUT("", func(c *gin.Context) {
-		err := blp.Instance().DefaultIdle()
+		err := blpInstance.Idle().Default()
 		if err != nil {
 			c.JSON(200, Response{
 				Code:      400,
@@ -797,7 +895,7 @@ func idleRouter(engine *gin.Engine) {
 			return
 		}
 
-		err = blp.Instance().SetIdle(&motion)
+		err = blpInstance.Idle().Set(&motion)
 		if err != nil {
 			log.Errorf(err.Error())
 			c.JSON(http.StatusBadRequest, Response{
@@ -822,11 +920,13 @@ func idleRouter(engine *gin.Engine) {
 }
 
 func cronRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
 	cronGroup := engine.Group("/v1/ptz/autoMovement")
 
 	// 获取定时任务
 	cronGroup.GET("", func(c *gin.Context) {
-		cron := blp.Instance().ListCron()
+		cron := blpInstance.Cron().List()
 
 		c.JSON(http.StatusOK, Response{
 			Code:      200,
@@ -840,7 +940,7 @@ func cronRouter(engine *gin.Engine) {
 
 	// 云台定时任务恢复默认配置
 	cronGroup.PUT("", func(c *gin.Context) {
-		err := blp.Instance().DefaultCron()
+		err := blpInstance.Cron().Default()
 		if err != nil {
 			c.JSON(200, Response{
 				Code:      400,
@@ -878,7 +978,7 @@ func cronRouter(engine *gin.Engine) {
 			return
 		}
 
-		err = blp.Instance().SetCron(&movement)
+		err = blpInstance.Cron().Set(&movement)
 		if err != nil {
 			log.Errorf(err.Error())
 			c.JSON(http.StatusBadRequest, Response{

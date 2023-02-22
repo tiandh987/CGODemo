@@ -2,6 +2,8 @@ package line
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/looplab/fsm"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/basic"
@@ -133,15 +135,19 @@ func New(b *basic.Basic, s dsd.LineSlice) *Line {
 	return l
 }
 
-func (l *Line) Start(ctx context.Context, id dsd.LineScanID) {
+func (l *Line) Start(ctx context.Context, id dsd.LineScanID) error {
+	if err := id.Validate(); err != nil {
+		return err
+	}
+
 	if l.fsm.Current() != none {
 		log.Warnf("line scan is running")
-		return
+		return errors.New("line scan is running")
 	}
 
 	if !l.lines[id-1].Enable {
-		log.Warnf("line scan (%d) is disable")
-		return
+		log.Warnf("line scan (%d) is disable", id)
+		return fmt.Errorf("line scan (%d) is disable", id)
 	}
 
 	event := leftMargin
@@ -151,21 +157,31 @@ func (l *Line) Start(ctx context.Context, id dsd.LineScanID) {
 
 	if !l.fsm.Can(event) {
 		log.Warnf("line scan can not convert to %s", event)
-		return
+		return fmt.Errorf("line scan can not convert to %s", event)
 	}
 
 	go l.fsm.Event(ctx, event, id)
 
 	l.lines[id-1].Running = true
+
+	return nil
 }
 
-func (l *Line) Stop(ctx context.Context, id dsd.LineScanID) {
-	if l.fsm.Current() == none || !l.lines[id-1].Running {
-		return
+func (l *Line) Stop(ctx context.Context, id dsd.LineScanID) error {
+	if err := id.Validate(); err != nil {
+		return err
 	}
 
-	l.fsm.Event(ctx, none)
+	if l.fsm.Current() == none || !l.lines[id-1].Running {
+		return nil
+	}
+
+	if err := l.fsm.Event(ctx, none); err != nil {
+		return err
+	}
+
 	l.lines[id-1].Running = false
+	return nil
 }
 
 func (l *Line) leftMargin(ctx context.Context, id dsd.LineScanID) error {

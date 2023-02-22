@@ -26,6 +26,10 @@ func (p *Preset) Start(ctx context.Context, id dsd.PresetID) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	if err := id.Validate(); err != nil {
+		return err
+	}
+
 	preset := p.presets[id-1]
 
 	if !preset.Enable {

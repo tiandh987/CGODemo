@@ -31,3 +31,14 @@ type Status struct {
 	TimingTaskID int   `json:"TimingTaskID" validate:"required,gte=1,lte=4"`
 	StartTime    int64 `json:"StartTime" validate:"required"`
 }
+
+func NewStatus() Status {
+	return Status{
+		Moving:       false,
+		Trigger:      0,
+		Function:     0,
+		FunctionID:   0,
+		TimingTaskID: 0,
+		StartTime:    0,
+	}
+}
