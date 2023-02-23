@@ -43,13 +43,27 @@ func TestCruise_Start(t *testing.T) {
 		Name:          "xxxx",
 		ResidenceTime: 3,
 	})
+	cruiseSlice[0].Preset = append(cruiseSlice[0].Preset, dsd.TourPresetPoint{
+		ID:            3,
+		Name:          "xxxxccc",
+		ResidenceTime: 3,
+	})
 
 	cruise := New(p, cruiseSlice)
 
-	cruise.Start(context.Background(), 1)
+	//ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx := context.Background()
+	cruise.Start(ctx, 1)
 
 	t.Logf("xxxxxxxxxxxxxxxxxxxxxxxxx")
 
-	time.Sleep(time.Second * 60)
-	cruise.Stop(context.Background(), 1)
+	time.Sleep(time.Second * 30)
+	cruise.Stop(ctx, 1)
+
+	time.Sleep(time.Second * 30)
+
+	t.Logf("cancelFunc exec")
+	//cancelFunc()
+
+	time.Sleep(time.Second * 3600)
 }

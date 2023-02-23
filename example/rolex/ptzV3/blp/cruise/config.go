@@ -1,7 +1,9 @@
 package cruise
 
 import (
+	"errors"
 	"github.com/tiandh987/CGODemo/example/rolex/config"
+	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 )
 
@@ -15,6 +17,11 @@ func (c *Cruise) List() dsd.CruiseSlice {
 func (c *Cruise) Default() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.fsm.Current() != none {
+		log.Warnf("cruise is running")
+		return errors.New("cruise is running")
+	}
 
 	before := c.cruises
 
@@ -36,6 +43,11 @@ func (c *Cruise) Update(id dsd.CruiseID, name string) error {
 		return err
 	}
 
+	if c.cruises[id-1].Running {
+		log.Warnf("cruise (%d) is running", id)
+		return errors.New("cruise is running")
+	}
+
 	before := c.cruises[id-1]
 
 	cruise.Enable = before.Enable
@@ -54,6 +66,11 @@ func (c *Cruise) Update(id dsd.CruiseID, name string) error {
 func (c *Cruise) Set(cr *dsd.TourPreset) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.cruises[cr.ID-1].Running {
+		log.Warnf("cruise (%d) is running", cr.ID)
+		return errors.New("cruise is running")
+	}
 
 	before := c.cruises[cr.ID-1]
 
@@ -74,6 +91,11 @@ func (c *Cruise) Set(cr *dsd.TourPreset) error {
 func (c *Cruise) Delete(id dsd.CruiseID) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.cruises[id-1].Running {
+		log.Warnf("cruise (%d) is running", id)
+		return errors.New("cruise is running")
+	}
 
 	before := c.cruises[id-1]
 

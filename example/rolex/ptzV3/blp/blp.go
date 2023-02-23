@@ -3,6 +3,7 @@ package blp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/basic"
@@ -168,7 +169,7 @@ type Request struct {
 	Trigger Trigger `json:"Trigger" validate:"gte=0,lte=4"`
 	Ability Ability `json:"Ability" validate:"gte=0,lte=7"`
 	ID      int     `json:"ID"`
-	Speed   int     `json:"Speed" validate:"required,gte=1,lte=8"`
+	Speed   int     `json:"Speed" validate:"gte=1,lte=8"`
 }
 
 func (r *Request) Validate() error {
@@ -200,12 +201,19 @@ func (b *Blp) Start(req *Request) error {
 		Trigger: req.Trigger,
 		Ability: st.function,
 		ID:      st.funcID,
-		Speed:   0,
+		Speed:   1,
 	}
 
-	// 终止当前动作
-	if err := b.stop(b.ctx, reqStop); err != nil {
-		return err
+	// 手动触发的云台动作，必须进行手动停止
+	if st.trigger == ManualTrigger && req.Trigger == ManualTrigger && st.function != None && st.function != Preset {
+		return fmt.Errorf("ptz is running, trigger: manual function: %d, funcID: %d", st.function, st.funcID)
+	}
+
+	// 终止当前动作(适用于定时任务、空闲动作触发)
+	if st.function != None {
+		if err := b.stop(b.ctx, reqStop); err != nil {
+			return err
+		}
 	}
 
 	switch req.Ability {
@@ -261,10 +269,6 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 	}
 
 	switch req.Ability {
-	case None:
-		if err := b.basic.Stop(); err != nil {
-			return err
-		}
 	case Cruise:
 		if err := b.cruise.Stop(ctx, dsd.CruiseID(req.ID)); err != nil {
 			return err

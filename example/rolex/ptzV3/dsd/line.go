@@ -14,7 +14,7 @@ const (
 	ClearRightMargin
 )
 
-const MarginNoLimit = -1
+const MarginNoLimit float64 = -1
 
 const (
 	MaxLineScanNum = 5

@@ -156,18 +156,49 @@ func (s *Serial) Position() (*dsd.Position, error) {
 }
 
 func (s *Serial) Goto(pos *dsd.Position) error {
-	pan, tilt, zoom := s.internalPosition(pos)
+	if err := s.GotoPan(pos); err != nil {
+		return err
+	}
 
-	log.Debugf("pan: %x - %.2f, tilt: %x - %.2f, zoom: %x - %.2f",
-		pan, pos.Pan, tilt, pos.Tilt, zoom, pos.Zoom)
+	if err := s.GotoTilt(pos); err != nil {
+		return err
+	}
+
+	if err := s.GotoZoom(pos); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Serial) GotoPan(pos *dsd.Position) error {
+	pan, _, _ := s.internalPosition(pos)
+
+	log.Debugf("pan: %x - %.2f", pan, pos.Pan)
 
 	if _, err := s.Send(protocol.PanSet, protocol.NoneReplay, pan[0], pan[1]); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (s *Serial) GotoTilt(pos *dsd.Position) error {
+	_, tilt, _ := s.internalPosition(pos)
+
+	log.Debugf("tilt: %x - %.2f", tilt, pos.Tilt)
+
 	if _, err := s.Send(protocol.TiltSet, protocol.NoneReplay, tilt[0], tilt[1]); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (s *Serial) GotoZoom(pos *dsd.Position) error {
+	_, _, zoom := s.internalPosition(pos)
+
+	log.Debugf("zoom: %x - %.2f", zoom, pos.Zoom)
 
 	if _, err := s.Send(protocol.ZoomSet, protocol.NoneReplay, zoom[0], zoom[1]); err != nil {
 		return err

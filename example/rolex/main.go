@@ -78,14 +78,26 @@ func main() {
 	ptzGroup.GET("/ptzversion", func(c *gin.Context) {
 		version := blpInstance.Basic().Version()
 
-		c.JSON(http.StatusOK, version)
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      version,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
 	})
 
 	// 查询云台型号
 	ptzGroup.GET("/ptzmodel", func(c *gin.Context) {
 		model := blpInstance.Basic().Model()
 
-		c.JSON(http.StatusOK, model)
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      model,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
 	})
 
 	// 查询云台状态
@@ -107,7 +119,13 @@ func main() {
 		dirNum, err := strconv.Atoi(direction)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -115,17 +133,35 @@ func main() {
 		speedNum, err := strconv.Atoi(speed)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := basic.Operation(dirNum).ValidateDirection(); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := ptz.Speed(speedNum).Validate(); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -136,13 +172,21 @@ func main() {
 			Speed:   speedNum,
 		}
 
+		log.Infof("req: %+v", req)
+
 		if err := blpInstance.Manager().Start(&req); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
 			return
 		}
 
-		time.Sleep(time.Millisecond * 200)
-		//time.Sleep(time.Second * 5)
+		//time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Second * 5)
 
 		req2 := blp.Request{
 			Trigger: blp.ManualTrigger,
@@ -150,12 +194,27 @@ func main() {
 			ID:      dirNum,
 			Speed:   speedNum,
 		}
+
+		log.Infof("req: %+v", req)
+
 		if err := blpInstance.Manager().Stop(&req2); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
-		c.JSON(http.StatusOK, "turn ok")
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      nil,
+			Detail:    "",
+			Message:   "turn ok",
+			Translate: "",
+		})
 		return
 	})
 
@@ -169,7 +228,7 @@ func main() {
 				Code:      400,
 				Data:      nil,
 				Detail:    "",
-				Message:   "",
+				Message:   err.Error(),
 				Translate: "",
 			})
 			return
@@ -179,21 +238,39 @@ func main() {
 		speedNum, err := strconv.Atoi(speed)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := basic.Operation(dirNum).ValidateDirection(); err != nil {
 			log.Error(err.Error())
 
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := ptz.Speed(speedNum).Validate(); err != nil {
 			log.Error(err.Error())
 
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -206,7 +283,13 @@ func main() {
 
 		if err := blpInstance.Manager().Start(&req); err != nil {
 			log.Error(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
 			return
 		}
 
@@ -220,12 +303,24 @@ func main() {
 		methodNum, err := strconv.Atoi(method)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := basic.Operation(methodNum).ValidateOperation(); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -237,7 +332,13 @@ func main() {
 		}
 
 		if err := blpInstance.Manager().Start(&req); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
 			return
 		}
 
@@ -251,11 +352,17 @@ func main() {
 			Trigger: blp.ManualTrigger,
 			Ability: blp.None,
 			ID:      0,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Stop(&req); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -272,7 +379,13 @@ func main() {
 		}
 
 		if err := blpInstance.Basic().Goto(&pos); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -316,7 +429,13 @@ func presetRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -324,11 +443,17 @@ func presetRouter(engine *gin.Engine) {
 			Trigger: blp.ManualTrigger,
 			Ability: blp.Preset,
 			ID:      idNum,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Start(req); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
 			return
 		}
 
@@ -342,14 +467,26 @@ func presetRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		name := c.Query("name")
 
 		if err := blpInstance.Preset().Update(dsd.PresetID(idNum), name); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -363,12 +500,24 @@ func presetRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := blpInstance.Preset().Delete(dsd.PresetID(idNum)); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -379,7 +528,13 @@ func presetRouter(engine *gin.Engine) {
 	// 删除全部预置点
 	presetGroup.DELETE("/removepresets", func(c *gin.Context) {
 		if err := blpInstance.Preset().DeleteAll(); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -393,14 +548,26 @@ func presetRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		name := c.Query("name")
 
 		if err := blpInstance.Preset().Set(dsd.PresetID(idNum), name); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -461,7 +628,13 @@ func lineRouter(engine *gin.Engine) {
 
 		if err := line.Validate(); err != nil {
 			log.Error(err.Error())
-			c.JSON(400, gin.H{"status": "bad param"})
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -486,7 +659,13 @@ func lineRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -494,12 +673,18 @@ func lineRouter(engine *gin.Engine) {
 			Trigger: blp.ManualTrigger,
 			Ability: blp.LineScan,
 			ID:      idNum,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Start(req); err != nil {
 			log.Error(err.Error())
-			c.JSON(500, "line start failed")
+			c.JSON(400, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -514,7 +699,13 @@ func lineRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -522,12 +713,18 @@ func lineRouter(engine *gin.Engine) {
 			Trigger: blp.ManualTrigger,
 			Ability: blp.LineScan,
 			ID:      idNum,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Stop(req); err != nil {
 			log.Error(err.Error())
-			c.JSON(500, "line start failed")
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -541,7 +738,13 @@ func lineRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -549,7 +752,13 @@ func lineRouter(engine *gin.Engine) {
 		limitNum, err := strconv.Atoi(limit)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -557,7 +766,13 @@ func lineRouter(engine *gin.Engine) {
 		clearBool, err := strconv.ParseBool(clear)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -572,8 +787,14 @@ func lineRouter(engine *gin.Engine) {
 		} else if !clearBool && limitNum == 2 {
 			op = dsd.SetRightMargin
 		} else {
-			err := fmt.Sprintf("param is invalid. limit: %d, clear: %t", limitNum, clearBool)
-			c.JSON(http.StatusBadRequest, err)
+			err := fmt.Errorf("param is invalid. limit: %d, clear: %t", limitNum, clearBool)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -642,14 +863,26 @@ func cruiseRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		name := c.Query("name")
 
 		if err := blpInstance.Cruise().Update(dsd.CruiseID(idNum), name); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -663,12 +896,24 @@ func cruiseRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		if err := blpInstance.Cruise().Delete(dsd.CruiseID(idNum)); err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -689,7 +934,13 @@ func cruiseRouter(engine *gin.Engine) {
 
 		if err := cruise.Validate(); err != nil {
 			log.Error(err.Error())
-			c.JSON(400, gin.H{"status": "bad param"})
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -714,7 +965,13 @@ func cruiseRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
@@ -722,12 +979,18 @@ func cruiseRouter(engine *gin.Engine) {
 			Trigger: blp.ManualTrigger,
 			Ability: blp.Cruise,
 			ID:      idNum,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Start(req); err != nil {
 			log.Error(err.Error())
-			c.JSON(500, "cruise start failed")
+			c.JSON(400, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    "",
+				Message:   err.Error(),
+				Translate: "",
+			})
 			return
 		}
 
@@ -741,20 +1004,32 @@ func cruiseRouter(engine *gin.Engine) {
 		idNum, err := strconv.Atoi(id)
 		if err != nil {
 			log.Errorf(err.Error())
-			c.JSON(http.StatusBadRequest, err)
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 
 		req := &blp.Request{
 			Trigger: blp.ManualTrigger,
-			Ability: blp.None,
+			Ability: blp.Cruise,
 			ID:      idNum,
-			Speed:   0,
+			Speed:   1,
 		}
 
 		if err := blpInstance.Manager().Stop(req); err != nil {
 			log.Error(err.Error())
-			c.JSON(500, "cruise stop failed")
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
 			return
 		}
 

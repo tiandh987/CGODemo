@@ -29,25 +29,29 @@ type Line struct {
 	mu    sync.RWMutex
 	lines dsd.LineSlice
 
-	fsm     *fsm.FSM
-	eventCh chan string
-	basic   *basic.Basic
+	fsm    *fsm.FSM
+	fsmCh  chan string
+	basic  *basic.Basic
+	timer  *time.Timer
+	stopCh chan dsd.LineScanID
 }
 
 func New(b *basic.Basic, s dsd.LineSlice) *Line {
 	l := &Line{
-		basic:   b,
-		lines:   s,
-		eventCh: make(chan string, 1),
+		basic:  b,
+		lines:  s,
+		fsmCh:  make(chan string, 1),
+		timer:  time.NewTimer(time.Second),
+		stopCh: make(chan dsd.LineScanID, 1),
 	}
 
 	l.fsm = fsm.NewFSM(
 		none,
 		fsm.Events{
 			{Name: none, Src: []string{leftMargin, leftResidence, leftToRight, rightMargin, rightResidence,
-				rightToLeft}, Dst: none},
+				rightToLeft, levelLeft}, Dst: none},
 			{Name: leftMargin, Src: []string{none, rightToLeft}, Dst: leftMargin},
-			{Name: leftResidence, Src: []string{none, leftMargin}, Dst: leftResidence},
+			{Name: leftResidence, Src: []string{leftMargin}, Dst: leftResidence},
 			{Name: leftToRight, Src: []string{leftResidence}, Dst: leftToRight},
 			{Name: rightMargin, Src: []string{leftToRight}, Dst: rightMargin},
 			{Name: rightResidence, Src: []string{rightMargin}, Dst: rightResidence},
@@ -57,75 +61,52 @@ func New(b *basic.Basic, s dsd.LineSlice) *Line {
 		},
 		fsm.Callbacks{
 			"enter_none": func(ctx context.Context, event *fsm.Event) {
-				log.Info("line scan enter_none")
-				if l.fsm.Current() != "none" {
-					l.basic.Stop()
-				}
+				l.basic.Stop()
 				return
 			},
-			"enter_leftMargin": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
 
-				if err := l.leftMargin(ctx, id); err != nil {
-					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
-					return
-				}
+			"enter_leftMargin": func(ctx context.Context, event *fsm.Event) {
+				l.fsmCh <- leftResidence
 			},
 			"enter_leftResidence": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
-
-				if err := l.leftResidence(ctx, id); err != nil {
+				line := event.Args[0].(dsd.LineScan)
+				if err := l.leftResidence(line); err != nil {
 					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
 					return
 				}
-
 			},
 			"enter_leftToRight": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
-
-				if err := l.leftToRight(ctx, id); err != nil {
+				line := event.Args[0].(dsd.LineScan)
+				if err := l.leftToRight(ctx, line); err != nil {
 					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
 					return
 				}
+				l.fsmCh <- rightMargin
 			},
 			"enter_rightMargin": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
-
-				log.Infof("line scan enter_rightMargin (%d)", id)
-
-				if err := l.fsm.Event(ctx, rightResidence, id); err != nil {
-					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
-					return
-				}
+				l.fsmCh <- rightResidence
 			},
 			"enter_rightResidence": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
-
-				if err := l.rightResidence(ctx, id); err != nil {
+				line := event.Args[0].(dsd.LineScan)
+				if err := l.rightResidence(line); err != nil {
 					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
 					return
 				}
 			},
 			"enter_rightToLeft": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
-
-				if err := l.rightToLeft(ctx, id); err != nil {
+				line := event.Args[0].(dsd.LineScan)
+				if err := l.rightToLeft(ctx, line); err != nil {
 					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
 					return
 				}
+				l.fsmCh <- leftMargin
 			},
 			"enter_levelLeft": func(ctx context.Context, event *fsm.Event) {
-				id := event.Args[0].(dsd.LineScanID)
+				line := event.Args[0].(dsd.LineScan)
+				log.Infof("enter_levelLeft (%d)", line.ID)
 
-				if err := l.basic.Operation(basic.DirectionLeft, ptz.Speed(l.lines[id-1].Speed)); err != nil {
+				if err := l.basic.Operation(basic.DirectionLeft, ptz.Speed(line.Speed)); err != nil {
 					log.Error(err.Error())
-					l.fsm.Event(ctx, none)
 					return
 				}
 			},
@@ -150,19 +131,92 @@ func (l *Line) Start(ctx context.Context, id dsd.LineScanID) error {
 		return fmt.Errorf("line scan (%d) is disable", id)
 	}
 
-	event := leftMargin
-	if l.lines[id-1].LeftMargin == dsd.MarginNoLimit || l.lines[id-1].RightMargin == dsd.MarginNoLimit {
-		event = levelLeft
-	}
+	go func(id dsd.LineScanID) {
+		line := l.lines[id-1]
+		l.lines[id-1].Running = true
+		l.fsmCh = make(chan string, 1)
+		l.stopCh = make(chan dsd.LineScanID, 1)
+		l.timer.Reset(time.Second)
+		<-l.timer.C
 
-	if !l.fsm.Can(event) {
-		log.Warnf("line scan can not convert to %s", event)
-		return fmt.Errorf("line scan can not convert to %s", event)
-	}
+		log.Infof("start line scan id: %d left: %f %ds right: %f %ds", id, line.LeftMargin, line.ResidenceTimeLeft,
+			line.RightMargin, line.ResidenceTimeRight)
 
-	go l.fsm.Event(ctx, event, id)
+		if line.LeftMargin == dsd.MarginNoLimit || line.RightMargin == dsd.MarginNoLimit {
+			l.fsmCh <- levelLeft
+		} else {
+			if err := l.gotoStartPosition(line); err != nil {
+				log.Error(err.Error())
+				goto EndLine
+			}
+			l.fsmCh <- leftMargin
+		}
 
-	l.lines[id-1].Running = true
+		for {
+			select {
+			case <-ctx.Done():
+				log.Warn(ctx.Err().Error())
+				goto EndLine
+			case stopId := <-l.stopCh:
+				if stopId != id {
+					log.Warnf("current id (%d), request id (%d)", id, stopId)
+					continue
+				}
+				goto EndLine
+			case <-l.timer.C:
+				switch l.fsm.Current() {
+				case leftResidence:
+					l.fsmCh <- leftToRight
+				case rightResidence:
+					l.fsmCh <- rightToLeft
+				}
+			case state := <-l.fsmCh:
+				switch state {
+				case leftMargin:
+					if err := l.fsm.Event(ctx, leftMargin, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case leftResidence:
+					if err := l.fsm.Event(ctx, leftResidence, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case leftToRight:
+					if err := l.fsm.Event(ctx, leftToRight, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case rightMargin:
+					if err := l.fsm.Event(ctx, rightMargin, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case rightResidence:
+					if err := l.fsm.Event(ctx, rightResidence, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case rightToLeft:
+					if err := l.fsm.Event(ctx, rightToLeft, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				case levelLeft:
+					if err := l.fsm.Event(ctx, levelLeft, line); err != nil {
+						log.Error(err.Error())
+						goto EndLine
+					}
+				}
+			}
+		}
+	EndLine:
+		log.Infof("end line scan (%d)", id)
+		l.lines[id-1].Running = false
+		l.fsm.Event(ctx, none)
+		close(l.fsmCh)
+		close(l.stopCh)
+	}(id)
 
 	return nil
 }
@@ -172,22 +226,21 @@ func (l *Line) Stop(ctx context.Context, id dsd.LineScanID) error {
 		return err
 	}
 
-	if l.fsm.Current() == none || !l.lines[id-1].Running {
+	log.Infof("current: %s, id: %d, running:%t", l.fsm.Current(), id, l.lines[id-1].Running)
+
+	if l.fsm.Current() != none && l.lines[id-1].Running {
+		l.stopCh <- id
 		return nil
 	}
 
-	if err := l.fsm.Event(ctx, none); err != nil {
-		return err
+	if l.fsm.Current() == none && l.lines[id-1].Running {
+		l.lines[id-1].Running = false
 	}
 
-	l.lines[id-1].Running = false
-	return nil
+	return fmt.Errorf("line scan (%d) is not running", id)
 }
 
-func (l *Line) leftMargin(ctx context.Context, id dsd.LineScanID) error {
-	log.Infof("line scan enter_leftMargin (%d)", id)
-
-	line := l.lines[id-1]
+func (l *Line) gotoStartPosition(line dsd.LineScan) error {
 	pos, err := l.basic.Position()
 	if err != nil {
 		return err
@@ -198,95 +251,86 @@ func (l *Line) leftMargin(ctx context.Context, id dsd.LineScanID) error {
 		return err
 	}
 
-	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*30)
+	timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancelFunc()
 
 	if err := l.basic.ReachPosition(timeoutCtx, pos); err != nil {
 		return err
 	}
 
-	if err := l.fsm.Event(ctx, leftResidence, id); err != nil {
-		return err
-	}
+	return nil
+}
+
+func (l *Line) leftResidence(line dsd.LineScan) error {
+	log.Infof("line scan enter_leftResidence (%d)", line.ID)
+
+	l.timer.Reset(time.Second * time.Duration(line.ResidenceTimeLeft))
 
 	return nil
 }
 
-func (l *Line) leftResidence(ctx context.Context, id dsd.LineScanID) error {
-	log.Infof("line scan enter_leftResidence (%d)", id)
-
-	time.Sleep(time.Duration(l.lines[id-1].ResidenceTimeLeft) * time.Second)
-
-	if err := l.fsm.Event(ctx, leftToRight, id); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (l *Line) leftToRight(ctx context.Context, id dsd.LineScanID) error {
-	log.Infof("line scan enter_leftToRight (%d)", id)
-
-	line := l.lines[id-1]
-	pos, err := l.basic.Position()
-	if err != nil {
-		return err
-	}
-	pos.Pan = line.RightMargin
+func (l *Line) leftToRight(ctx context.Context, line dsd.LineScan) error {
+	log.Infof("line scan enter_leftToRight (%d)", line.ID)
 
 	if err := l.basic.Operation(basic.DirectionRight, ptz.Speed(line.Speed)); err != nil {
 		return err
 	}
 
-	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*30)
-	defer cancelFunc()
-	if err := l.basic.ReachPosition(timeoutCtx, pos); err != nil {
-		return err
-	}
-
-	if err = l.fsm.Event(ctx, rightMargin, id); err != nil {
-		return err
-	}
+	l.arrivePan(ctx, line.RightMargin)
 
 	return nil
 }
 
-func (l *Line) rightResidence(ctx context.Context, id dsd.LineScanID) error {
-	log.Infof("line scan enter_rightResidence (%d)", id)
+func (l *Line) rightResidence(line dsd.LineScan) error {
+	log.Infof("line scan enter_rightResidence (%d)", line.ID)
 
-	line := l.lines[id-1]
-	time.Sleep(time.Duration(line.ResidenceTimeRight) * time.Second)
-
-	if err := l.fsm.Event(ctx, rightToLeft, id); err != nil {
-		return err
-	}
+	l.timer.Reset(time.Second * time.Duration(line.ResidenceTimeRight))
 
 	return nil
 }
 
-func (l *Line) rightToLeft(ctx context.Context, id dsd.LineScanID) error {
-	log.Infof("line scan enter_rightToLeft (%d)", id)
-
-	line := l.lines[id-1]
-	pos, err := l.basic.Position()
-	if err != nil {
-		return err
-	}
-	pos.Pan = line.RightMargin
+func (l *Line) rightToLeft(ctx context.Context, line dsd.LineScan) error {
+	log.Infof("line scan enter_rightToLeft (%d)", line.ID)
 
 	if err := l.basic.Operation(basic.DirectionLeft, ptz.Speed(line.Speed)); err != nil {
 		return err
 	}
 
-	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*30)
-	defer cancelFunc()
-	if err := l.basic.ReachPosition(timeoutCtx, pos); err != nil {
-		return err
-	}
-
-	if err := l.fsm.Event(ctx, leftMargin, id); err != nil {
-		return err
-	}
+	l.arrivePan(ctx, line.LeftMargin)
 
 	return nil
+}
+
+func (l *Line) arrivePan(ctx context.Context, pan float64) {
+	go func() {
+		ticker := time.NewTicker(time.Millisecond * 10)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Panic(ctx.Err().Error())
+				return
+			case <-ticker.C:
+				pos, err := l.basic.Position()
+				if err != nil {
+					log.Error(err.Error())
+					return
+				}
+				if pos.Pan >= pan-2 && pos.Pan <= pan+2 {
+					if err := l.basic.Stop(); err != nil {
+						log.Error(err.Error())
+						return
+					}
+
+					switch l.fsm.Current() {
+					case leftToRight:
+						l.fsmCh <- rightMargin
+					case rightToLeft:
+						l.fsmCh <- leftMargin
+					}
+
+					return
+				}
+			}
+		}
+	}()
 }
