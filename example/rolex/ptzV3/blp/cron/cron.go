@@ -10,7 +10,7 @@ import (
 
 type Cron struct {
 	mu        sync.RWMutex
-	movements []dsd.PtzAutoMovement
+	movements dsd.AutoMovementSlice
 
 	crontab *cron.Cron
 	infos   [][]ScheduleInfo
@@ -21,7 +21,7 @@ type ScheduleInfo struct {
 	CronID     int
 	Function   dsd.CronFunction
 	FuncID     int
-	AutoHoming time.Duration
+	AutoHoming int
 	start      time.Time
 	end        time.Time
 }
@@ -62,6 +62,7 @@ func (c *Cron) Run() {
 	for _, info := range weekdayInfo {
 		if now.After(info.start) && now.Before(info.end) {
 			c.infoCh <- info
+			return
 		}
 	}
 }

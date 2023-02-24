@@ -88,7 +88,7 @@ func (s *state) update(req *Request) {
 	s.startTime = time.Now()
 
 	if req.Ability == None {
-		msg := message.NewMessage(watermill.NewUUID(), message.Payload(s.startTime.String()))
+		msg := message.NewMessage(watermill.NewUUID(), message.Payload(s.startTime.Format("2006-01-02 15:04:05")))
 		if err := s.pubSub.Publish(stateNoneTopic, msg); err != nil {
 			log.Error(err.Error())
 		}
@@ -122,9 +122,10 @@ func (s *state) getExternal() *dsd.Status {
 
 func (s *state) getInternal() state {
 	st := state{
-		trigger:  s.trigger,
-		function: s.function,
-		funcID:   s.funcID,
+		trigger:   s.trigger,
+		function:  s.function,
+		funcID:    s.funcID,
+		startTime: s.startTime,
 	}
 
 	return st

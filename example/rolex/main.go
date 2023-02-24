@@ -185,12 +185,12 @@ func main() {
 			return
 		}
 
-		//time.Sleep(time.Millisecond * 200)
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Millisecond * 200)
+		//time.Sleep(time.Second * 5)
 
 		req2 := blp.Request{
 			Trigger: blp.ManualTrigger,
-			Ability: blp.None,
+			Ability: blp.ManualFunc,
 			ID:      dirNum,
 			Speed:   speedNum,
 		}
@@ -350,8 +350,8 @@ func main() {
 	ptzGroup.PUT("/stop", func(c *gin.Context) {
 		req := blp.Request{
 			Trigger: blp.ManualTrigger,
-			Ability: blp.None,
-			ID:      0,
+			Ability: blp.ManualFunc,
+			ID:      blpInstance.Manager().State().FunctionID,
 			Speed:   1,
 		}
 

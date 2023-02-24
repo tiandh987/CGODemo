@@ -31,6 +31,8 @@ type Cruise struct {
 	timer    *time.Timer
 	preset   *preset.Preset
 	stopCh   chan dsd.CruiseID
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func New(preset *preset.Preset, cruises dsd.CruiseSlice) *Cruise {
@@ -56,7 +58,7 @@ func New(preset *preset.Preset, cruises dsd.CruiseSlice) *Cruise {
 			},
 			"enter_jumping": func(ctx context.Context, event *fsm.Event) {
 				id := event.Args[0].(dsd.CruiseID)
-				c.jumping(ctx, id)
+				go c.jumping(id)
 				return
 			},
 			"enter_skip": func(ctx context.Context, event *fsm.Event) {
@@ -68,7 +70,7 @@ func New(preset *preset.Preset, cruises dsd.CruiseSlice) *Cruise {
 			},
 			"enter_residence": func(ctx context.Context, event *fsm.Event) {
 				id := event.Args[0].(dsd.CruiseID)
-				c.residence(ctx, id)
+				c.residence(id)
 				return
 			},
 		})
@@ -97,21 +99,28 @@ func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) error {
 		return fmt.Errorf("cruise (%d - %s) is empty", id, cruise.Name)
 	}
 
-	go func(id dsd.CruiseID) {
+	go func() {
+		log.Infof("1 cruise stop channel %+v", c.stopCh)
+
 		c.initIndex(id)
-		c.cruises[id-1].Running = true
+		c.ctx, c.cancel = context.WithCancel(ctx)
 		c.fsmCh = make(chan string, 1)
 		c.stopCh = make(chan dsd.CruiseID, 1)
-		c.timer.Reset(time.Second * 3)
+		c.fsmCh <- jumping
 
 		log.Infof("start cruise id: %d index: %d maxIndex: %d", id, c.index, c.maxIndex)
 
+		log.Infof("2 cruise stop channel %+v", c.stopCh)
+
 		for {
+			c.cruises[id-1].Running = true
+
 			select {
 			case <-ctx.Done():
 				log.Warn(ctx.Err().Error())
 				goto EndCruise
 			case stopId := <-c.stopCh:
+				log.Infof("cruise receive stop id: %d", stopId)
 				if stopId != id {
 					log.Warnf("current id (%d), request id (%d)", id, stopId)
 					continue
@@ -122,7 +131,7 @@ func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) error {
 			case state := <-c.fsmCh:
 				switch state {
 				case jumping:
-					if err := c.fsm.Event(ctx, jumping, id); err != nil {
+					if err := c.fsm.Event(c.ctx, jumping, id); err != nil {
 						log.Error(err.Error())
 						goto EndCruise
 					}
@@ -137,15 +146,18 @@ func (c *Cruise) Start(ctx context.Context, id dsd.CruiseID) error {
 						goto EndCruise
 					}
 				}
+			default:
+				log.Infof("3 cruise stop channel %+v fsm.Current: %s", c.stopCh, c.fsm.Current())
+				time.Sleep(time.Second * 5)
 			}
 		}
 	EndCruise:
 		log.Infof("end cruise (%d)", id)
 		c.cruises[id-1].Running = false
 		c.fsm.Event(ctx, none)
-		close(c.fsmCh)
-		close(c.stopCh)
-	}(id)
+		c.cancel()
+		//close(c.fsmCh)
+	}()
 
 	return nil
 }
@@ -157,13 +169,15 @@ func (c *Cruise) Stop(ctx context.Context, id dsd.CruiseID) error {
 
 	log.Infof("current: %s, id: %d, running:%t", c.fsm.Current(), id, c.cruises[id-1].Running)
 
-	if c.fsm.Current() != none && c.cruises[id-1].Running {
+	if (c.fsm.Current() != none && c.cruises[id-1].Running) ||
+		(c.fsm.Current() == none && c.cruises[id-1].Running) {
+		log.Infof("send %d to cruise stop channel %+v", id, c.stopCh)
 		c.stopCh <- id
-		return nil
-	}
+		close(c.stopCh)
 
-	if c.fsm.Current() == none && c.cruises[id-1].Running {
-		c.cruises[id-1].Running = false
+		log.Infof("send %d to cruise stop channel ok", id)
+
+		return nil
 	}
 
 	return fmt.Errorf("cruise (%d) is not running", id)
@@ -187,19 +201,19 @@ func (c *Cruise) resetIndex() {
 	c.maxIndex = 0
 }
 
-func (c *Cruise) jumping(ctx context.Context, id dsd.CruiseID) {
+func (c *Cruise) jumping(id dsd.CruiseID) {
 	log.Infof("cruise enter_jumping (%d - %d)", id, c.index)
 
-	preset := c.cruises[id-1].Preset[c.index]
-	if err := c.preset.Start(ctx, preset.ID); err != nil {
+	p := c.cruises[id-1].Preset[c.index]
+	if err := c.preset.Start(c.ctx, p.ID); err != nil {
 		log.Error(err.Error())
 		c.fsmCh <- skip
 		return
 	}
 
-	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*30)
+	timeoutCtx, cancelFunc := context.WithTimeout(c.ctx, time.Second*60)
 	defer cancelFunc()
-	if err := c.preset.ReachPreset(timeoutCtx, preset.ID); err != nil {
+	if err := c.preset.ReachPreset(timeoutCtx, p.ID); err != nil {
 		log.Error(err.Error())
 		c.fsmCh <- skip
 		return
@@ -210,12 +224,12 @@ func (c *Cruise) jumping(ctx context.Context, id dsd.CruiseID) {
 	return
 }
 
-func (c *Cruise) residence(ctx context.Context, id dsd.CruiseID) {
+func (c *Cruise) residence(id dsd.CruiseID) {
 	log.Infof("cruise enter_residence (%d - %d)", id, c.index)
 
-	preset := c.cruises[id-1].Preset[c.index]
+	p := c.cruises[id-1].Preset[c.index]
 	c.updateIndex()
-	c.timer.Reset(time.Second * time.Duration(preset.ResidenceTime))
+	c.timer.Reset(time.Second * time.Duration(p.ResidenceTime))
 
 	return
 }

@@ -80,6 +80,7 @@ func (b *Basic) Restart() {
 }
 
 func (b *Basic) Stop() error {
+	log.Error("xxxxxxxxxxxxxxxxxxxxxxxxx")
 	if err := b.ar.Stop(); err != nil {
 		log.Errorf(err.Error())
 		return err

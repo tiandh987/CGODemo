@@ -16,6 +16,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 	"sync"
+	"time"
 )
 
 var _validate = validator.New()
@@ -209,11 +210,12 @@ func (b *Blp) Start(req *Request) error {
 		return fmt.Errorf("ptz is running, trigger: manual function: %d, funcID: %d", st.function, st.funcID)
 	}
 
-	// 终止当前动作(适用于定时任务、空闲动作触发)
+	// 终止当前动作(当触发者为报警联动、定时任务、空闲动作时)
 	if st.function != None {
 		if err := b.stop(b.ctx, reqStop); err != nil {
 			return err
 		}
+		time.Sleep(time.Second * 10)
 	}
 
 	switch req.Ability {
@@ -244,6 +246,9 @@ func (b *Blp) Start(req *Request) error {
 		return errors.New("ptz ability is invalid")
 	}
 
+	// 等待云台启动完成
+	time.Sleep(time.Millisecond * 100)
+
 	b.state.update(req)
 
 	return nil
@@ -268,6 +273,12 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 		return err
 	}
 
+	st := b.state.getInternal()
+	if req.Ability != st.function || req.ID != st.funcID {
+		return fmt.Errorf("current trigger: %d function: %d funcID: %d, request trigger: %d function: %d funcID: %d",
+			st.trigger, st.function, st.funcID, req.Trigger, req.Ability, req.ID)
+	}
+
 	switch req.Ability {
 	case Cruise:
 		if err := b.cruise.Stop(ctx, dsd.CruiseID(req.ID)); err != nil {
@@ -276,7 +287,7 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 	case Trace:
 
 	case LineScan:
-		if err := b.line.Stop(ctx, dsd.LineScanID(req.ID)); err != nil {
+		if err := b.line.Stop(dsd.LineScanID(req.ID)); err != nil {
 			return err
 		}
 	case RegionScan:

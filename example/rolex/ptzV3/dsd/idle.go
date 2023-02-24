@@ -6,7 +6,7 @@ type IdleMotion struct {
 	Function        int  `json:"Function" validate:"gte=0,lte=5"`
 	PresetID        int  `json:"PresetID" validate:"required,gte=1,lte=255"`
 	TourID          int  `json:"TourID" validate:"required,gte=1,lte=8"`
-	PatternID       int  `json:"TourID" validate:"required,gte=1,lte=5"`
+	PatternID       int  `json:"PatternID" validate:"required,gte=1,lte=5"`
 	LinearScanID    int  `json:"LinearScanID" validate:"required,gte=1,lte=5"`
 	RegionScanID    int  `json:"RegionScanID" validate:"required,gte=1,lte=5"`
 	Running         bool `json:"Runing" validate:"boolean"`

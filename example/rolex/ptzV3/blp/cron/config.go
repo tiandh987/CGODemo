@@ -3,6 +3,7 @@ package cron
 import (
 	"errors"
 	"fmt"
+	"github.com/tiandh987/CGODemo/example/rolex/config"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 	"sort"
@@ -37,6 +38,10 @@ func (c *Cron) Set(movement *dsd.PtzAutoMovement) error {
 		infos: make([][]ScheduleInfo, 7),
 	}
 	if err := cron.convert(movements); err != nil {
+		return err
+	}
+
+	if err := config.SetConfig(c.movements.ConfigKey(), c.movements); err != nil {
 		return err
 	}
 
@@ -97,7 +102,7 @@ func (c *Cron) convert(movements []dsd.PtzAutoMovement) error {
 					CronID:     int(movement.ID),
 					Function:   dsd.CronFunction(movement.Function),
 					FuncID:     funcID,
-					AutoHoming: time.Duration(homing),
+					AutoHoming: homing,
 					start:      start,
 					end:        end,
 				}
@@ -155,7 +160,7 @@ func parseTimeStr(str string) (time.Time, error) {
 	timeStr := fmt.Sprintf("%s-%s-%s %s", time.Now().Format("2006"), time.Now().Format("01"),
 		time.Now().Format("02"), str)
 
-	t, err := time.Parse("2006-01-02 15:04:05", timeStr)
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", timeStr, time.Local)
 	if err != nil {
 		return time.Time{}, err
 	}

@@ -6,8 +6,6 @@ import (
 )
 
 func (b *Blp) startPowerUp() {
-	log.Info("start ptz power up...")
-
 	if !b.power.Enable() {
 		log.Info("power up is disable")
 
@@ -15,6 +13,7 @@ func (b *Blp) startPowerUp() {
 	}
 
 	function, id := b.power.GetFuncAndId()
+	log.Infof("start ptz power up (%d %d)", function, id)
 
 	ability := None
 

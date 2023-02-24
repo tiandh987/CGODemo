@@ -34,6 +34,8 @@ type Line struct {
 	basic  *basic.Basic
 	timer  *time.Timer
 	stopCh chan dsd.LineScanID
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func New(b *basic.Basic, s dsd.LineSlice) *Line {
@@ -77,11 +79,11 @@ func New(b *basic.Basic, s dsd.LineSlice) *Line {
 			},
 			"enter_leftToRight": func(ctx context.Context, event *fsm.Event) {
 				line := event.Args[0].(dsd.LineScan)
-				if err := l.leftToRight(ctx, line); err != nil {
+				if err := l.leftToRight(line); err != nil {
 					log.Error(err.Error())
 					return
 				}
-				l.fsmCh <- rightMargin
+				//l.fsmCh <- rightMargin
 			},
 			"enter_rightMargin": func(ctx context.Context, event *fsm.Event) {
 				l.fsmCh <- rightResidence
@@ -95,11 +97,11 @@ func New(b *basic.Basic, s dsd.LineSlice) *Line {
 			},
 			"enter_rightToLeft": func(ctx context.Context, event *fsm.Event) {
 				line := event.Args[0].(dsd.LineScan)
-				if err := l.rightToLeft(ctx, line); err != nil {
+				if err := l.rightToLeft(line); err != nil {
 					log.Error(err.Error())
 					return
 				}
-				l.fsmCh <- leftMargin
+				//l.fsmCh <- leftMargin
 			},
 			"enter_levelLeft": func(ctx context.Context, event *fsm.Event) {
 				line := event.Args[0].(dsd.LineScan)
@@ -133,11 +135,9 @@ func (l *Line) Start(ctx context.Context, id dsd.LineScanID) error {
 
 	go func(id dsd.LineScanID) {
 		line := l.lines[id-1]
-		l.lines[id-1].Running = true
+		l.ctx, l.cancel = context.WithCancel(context.Background())
 		l.fsmCh = make(chan string, 1)
 		l.stopCh = make(chan dsd.LineScanID, 1)
-		l.timer.Reset(time.Second)
-		<-l.timer.C
 
 		log.Infof("start line scan id: %d left: %f %ds right: %f %ds", id, line.LeftMargin, line.ResidenceTimeLeft,
 			line.RightMargin, line.ResidenceTimeRight)
@@ -153,11 +153,14 @@ func (l *Line) Start(ctx context.Context, id dsd.LineScanID) error {
 		}
 
 		for {
+			l.lines[id-1].Running = true
+
 			select {
 			case <-ctx.Done():
 				log.Warn(ctx.Err().Error())
 				goto EndLine
 			case stopId := <-l.stopCh:
+				log.Infof("line receive stop id: %d", stopId)
 				if stopId != id {
 					log.Warnf("current id (%d), request id (%d)", id, stopId)
 					continue
@@ -215,26 +218,24 @@ func (l *Line) Start(ctx context.Context, id dsd.LineScanID) error {
 		l.lines[id-1].Running = false
 		l.fsm.Event(ctx, none)
 		close(l.fsmCh)
-		close(l.stopCh)
+		l.cancel()
 	}(id)
 
 	return nil
 }
 
-func (l *Line) Stop(ctx context.Context, id dsd.LineScanID) error {
+func (l *Line) Stop(id dsd.LineScanID) error {
 	if err := id.Validate(); err != nil {
 		return err
 	}
 
 	log.Infof("current: %s, id: %d, running:%t", l.fsm.Current(), id, l.lines[id-1].Running)
 
-	if l.fsm.Current() != none && l.lines[id-1].Running {
+	if (l.fsm.Current() != none && l.lines[id-1].Running) ||
+		(l.fsm.Current() == none && l.lines[id-1].Running) {
 		l.stopCh <- id
+		close(l.stopCh)
 		return nil
-	}
-
-	if l.fsm.Current() == none && l.lines[id-1].Running {
-		l.lines[id-1].Running = false
 	}
 
 	return fmt.Errorf("line scan (%d) is not running", id)
@@ -262,21 +263,21 @@ func (l *Line) gotoStartPosition(line dsd.LineScan) error {
 }
 
 func (l *Line) leftResidence(line dsd.LineScan) error {
-	log.Infof("line scan enter_leftResidence (%d)", line.ID)
+	log.Infof("line scan enter_leftResidence (%d %ds)", line.ID, line.ResidenceTimeLeft)
 
 	l.timer.Reset(time.Second * time.Duration(line.ResidenceTimeLeft))
 
 	return nil
 }
 
-func (l *Line) leftToRight(ctx context.Context, line dsd.LineScan) error {
+func (l *Line) leftToRight(line dsd.LineScan) error {
 	log.Infof("line scan enter_leftToRight (%d)", line.ID)
 
 	if err := l.basic.Operation(basic.DirectionRight, ptz.Speed(line.Speed)); err != nil {
 		return err
 	}
 
-	l.arrivePan(ctx, line.RightMargin)
+	l.arrivePan(line.RightMargin)
 
 	return nil
 }
@@ -289,25 +290,28 @@ func (l *Line) rightResidence(line dsd.LineScan) error {
 	return nil
 }
 
-func (l *Line) rightToLeft(ctx context.Context, line dsd.LineScan) error {
+func (l *Line) rightToLeft(line dsd.LineScan) error {
 	log.Infof("line scan enter_rightToLeft (%d)", line.ID)
 
 	if err := l.basic.Operation(basic.DirectionLeft, ptz.Speed(line.Speed)); err != nil {
 		return err
 	}
 
-	l.arrivePan(ctx, line.LeftMargin)
+	l.arrivePan(line.LeftMargin)
 
 	return nil
 }
 
-func (l *Line) arrivePan(ctx context.Context, pan float64) {
+func (l *Line) arrivePan(pan float64) {
 	go func() {
+		timeoutCtx, cancelFunc := context.WithTimeout(l.ctx, time.Second*60)
+		defer cancelFunc()
+
 		ticker := time.NewTicker(time.Millisecond * 10)
 		for {
 			select {
-			case <-ctx.Done():
-				log.Panic(ctx.Err().Error())
+			case <-timeoutCtx.Done():
+				log.Warn(timeoutCtx.Err().Error())
 				return
 			case <-ticker.C:
 				pos, err := l.basic.Position()

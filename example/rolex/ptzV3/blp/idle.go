@@ -14,6 +14,8 @@ func (b *Blp) startIdle() {
 	}
 
 	go func() {
+		log.Info("start idle action detection process")
+
 		timer := time.NewTimer(time.Second)
 		<-timer.C
 		for {
@@ -22,6 +24,22 @@ func (b *Blp) startIdle() {
 				return
 			case <-timer.C:
 				function, id := b.idle.GetFuncAndId()
+
+				if !b.idle.Enable() {
+					log.Info("idle action triggered but disabled")
+					continue
+				}
+
+				state := b.state.getInternal()
+				if state.function != None {
+					log.Info("idle action triggered but current state is not none")
+					continue
+				}
+
+				if state.startTime.Add(time.Second * time.Duration(b.idle.GetSecond())).After(time.Now()) {
+					log.Info("idle action is triggered but time is not up")
+					continue
+				}
 
 				ability := None
 				switch function {
@@ -46,13 +64,20 @@ func (b *Blp) startIdle() {
 					Speed:   1,
 				}
 
+				log.Infof("trigger idle action, none time: %s ability: %d, funcID: %d",
+					state.startTime.Format("2006-01-02 15:04:05"), ability, id)
+
 				if err := b.Start(&req); err != nil {
 					log.Warnf("idle request: %+v, err: %s", req, err.Error())
 				}
-			case <-noneTopic:
+			case msg := <-noneTopic:
+				msg.Ack()
+
 				if !b.idle.Enable() {
+					log.Info("idle action triggered but disabled")
 					continue
 				}
+
 				sec := b.idle.GetSecond()
 				timer.Reset(time.Second * time.Duration(sec))
 			}

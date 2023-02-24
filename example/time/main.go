@@ -40,4 +40,23 @@ func main() {
 
 	fmt.Printf("now: %s, \nstart: %s, \nend: %s\n\n",
 		now.Format("2006-01-02 15:04:05"), start.Format("2006-01-02 15:04:05"), end.Format("2006-01-02 15:04:05"))
+
+	parse, err := time.Parse("2006-01-02 15:04:05", "2023-02-24 10:30:55")
+	if err != nil {
+		panic(err)
+	}
+
+	parse2, err2 := time.Parse("2006-01-02 15:04:05", "2023-02-24 10:31:03")
+	if err != nil {
+		panic(err2)
+	}
+
+	sub := parse2.Sub(parse)
+
+	fmt.Printf("sub: %d\n", sub)
+
+	fmt.Printf("now: %s\n", time.Now().String())
+	time.Sleep(sub)
+	fmt.Printf("now: %s\n", time.Now().String())
+
 }

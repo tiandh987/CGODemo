@@ -17,7 +17,7 @@ type CruiseID int
 func (i CruiseID) Validate() error {
 	if err := _validate.Var(i, "gte=1,lte=8"); err != nil {
 		log.Error(err.Error())
-		return errors.New("curse id is invalid")
+		return errors.New("cruise id is invalid")
 	}
 
 	return nil

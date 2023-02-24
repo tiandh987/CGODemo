@@ -7,33 +7,24 @@ import (
 )
 
 func (b *Blp) startCron() {
-	noneTopic, err := b.state.subscribe(b.ctx, stateNoneTopic)
-	if err != nil {
-		log.Panic(err.Error())
-		return
-	}
-
 	cronCh := b.cron.Start()
 
 	go func() {
-		noneTime := time.Now()
+		log.Info("start cron action detection process")
+
 		for {
 			select {
 			case <-b.ctx.Done():
 				b.cron.Stop()
 				return
-			case msg := <-noneTopic:
-				parse, err := time.Parse("2006-01-02 15:04:05", string(msg.Payload))
-				if err != nil {
-					log.Error(err.Error())
-					continue
-				}
-				noneTime = parse
 			case info := <-cronCh:
-				if time.Now().Sub(noneTime) < info.AutoHoming {
-					log.Infof("the difference between the current time(%s) and noneTime(%s) is less than autoHoming(%d)",
-						time.Now().String(), noneTime.String(), info.AutoHoming)
-					continue
+				st := b.state.getInternal()
+				if st.function == None {
+					if st.startTime.Add(time.Second * time.Duration(info.AutoHoming)).After(time.Now()) {
+						log.Infof("cron action is triggered but autoHoming time is not up, noneTime: %s autoHoming: %d",
+							st.startTime.Format("2006-01-02 15:04:05"), info.AutoHoming)
+						continue
+					}
 				}
 
 				ability := None
@@ -52,12 +43,19 @@ func (b *Blp) startCron() {
 					continue
 				}
 
+				if st.trigger == CronTrigger && st.function == ability && st.funcID == info.FuncID {
+					log.Debugf("cron(%d %d) is running, skipping", st.function, st.funcID)
+					continue
+				}
+
 				req := Request{
 					Trigger: CronTrigger,
 					Ability: ability,
 					ID:      info.FuncID,
 					Speed:   1,
 				}
+
+				log.Infof("trigger cron action, ability: %d, funcID: %d", ability, info.FuncID)
 
 				if err := b.Start(&req); err != nil {
 					log.Warnf("cron request: %+v, err: %s", req, err.Error())
