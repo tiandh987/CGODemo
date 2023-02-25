@@ -2,6 +2,7 @@ package cruise
 
 import (
 	"errors"
+	"fmt"
 	"github.com/tiandh987/CGODemo/example/rolex/config"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
@@ -18,9 +19,9 @@ func (c *Cruise) Default() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.fsm.Current() != none {
-		log.Warnf("cruise is running")
-		return errors.New("cruise is running")
+	if c.running > 0 {
+		log.Warnf("cruise(%d) is running", c.running)
+		return fmt.Errorf("cruise(%d) is running", c.running)
 	}
 
 	before := c.cruises

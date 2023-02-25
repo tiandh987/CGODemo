@@ -98,7 +98,7 @@ func Start() error {
 
 	l := line.New(b, lines)
 
-	c := cruise.New(p, cruises)
+	c := cruise.New(b, p, cruises)
 
 	up := powerUp.New(ups)
 

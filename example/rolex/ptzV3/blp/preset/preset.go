@@ -44,16 +44,3 @@ func (p *Preset) Start(ctx context.Context, id dsd.PresetID) error {
 
 	return nil
 }
-
-func (p *Preset) ReachPreset(ctx context.Context, id dsd.PresetID) error {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	preset := p.presets[id-1]
-
-	if err := p.basic.ReachPosition(ctx, &preset.Position); err != nil {
-		return err
-	}
-
-	return nil
-}

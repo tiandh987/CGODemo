@@ -48,6 +48,10 @@ func (b *Blp) startCron() {
 					continue
 				}
 
+				if st.trigger.compare(CronTrigger) && st.function != None {
+					continue
+				}
+
 				req := Request{
 					Trigger: CronTrigger,
 					Ability: ability,

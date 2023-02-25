@@ -215,12 +215,12 @@ func (b *Blp) Start(req *Request) error {
 		if err := b.stop(b.ctx, reqStop); err != nil {
 			return err
 		}
-		time.Sleep(time.Second * 10)
+		//time.Sleep(time.Second * 10)
 	}
 
 	switch req.Ability {
 	case Cruise:
-		if err := b.cruise.Start(b.ctx, dsd.CruiseID(req.ID)); err != nil {
+		if err := b.cruise.Start(dsd.CruiseID(req.ID)); err != nil {
 			return err
 		}
 	case Trace:
@@ -281,7 +281,7 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 
 	switch req.Ability {
 	case Cruise:
-		if err := b.cruise.Stop(ctx, dsd.CruiseID(req.ID)); err != nil {
+		if err := b.cruise.Stop(dsd.CruiseID(req.ID)); err != nil {
 			return err
 		}
 	case Trace:

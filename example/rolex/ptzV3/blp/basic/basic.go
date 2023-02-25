@@ -17,7 +17,7 @@ func New(repo ptz.AbilityRepo) *Basic {
 }
 
 func (b *Basic) Operation(id Operation, speed ptz.Speed) error {
-	//log.Infof("id: %d, speed: %d", id, speed)
+	log.Debugf("id: %d, speed: %d", id, speed)
 
 	switch id {
 	case DirectionUp:
@@ -80,7 +80,6 @@ func (b *Basic) Restart() {
 }
 
 func (b *Basic) Stop() error {
-	log.Error("xxxxxxxxxxxxxxxxxxxxxxxxx")
 	if err := b.ar.Stop(); err != nil {
 		log.Errorf(err.Error())
 		return err
