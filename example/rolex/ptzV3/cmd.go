@@ -11,6 +11,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/line"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/preset"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/trace"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 )
 
@@ -54,15 +55,14 @@ func Start() error {
 		return err
 	}
 
-	////// 巡迹
-	////pattern := dsd.Pattern{}
-	////cruises := pattern.Default()
-	////if err := config.SetDefault(cruise.ConfigKey(), cruises); err != nil {
-	////	return err
-	////}
-	////if err := config.GetConfig(cruise.ConfigKey(), &cruises); err != nil {
-	////	return err
-	////}
+	// 巡迹
+	records := dsd.NewRecordSlice()
+	if err := config.SetDefault(records.ConfigKey(), records); err != nil {
+		return err
+	}
+	if err := config.GetConfig(records.ConfigKey(), &records); err != nil {
+		return err
+	}
 
 	// 开机动作
 	ups := dsd.NewPowerUps()
@@ -91,7 +91,7 @@ func Start() error {
 		return err
 	}
 
-	s := serial.New("", ptz)
+	s := serial.NewSerialV2("", ptz)
 	b := basic.New(s)
 
 	p := preset.New(b, presets)
@@ -100,13 +100,15 @@ func Start() error {
 
 	c := cruise.New(b, p, cruises)
 
+	t := trace.New(b, records)
+
 	up := powerUp.New(ups)
 
 	i := idle.New(motion)
 
 	c2 := cron.New(movementSlice)
 
-	ptzBlpIns = blp.New(b, p, l, c, up, i, c2)
+	ptzBlpIns = blp.New(b, p, l, c, t, up, i, c2)
 
 	ptzBlpIns.Manager().Run()
 

@@ -14,6 +14,7 @@ import (
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/powerUp"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/preset"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
+	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/trace"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ type Blp struct {
 	preset     *preset.Preset
 	line       *line.Line
 	cruise     *cruise.Cruise
+	trace      *trace.Trace
 	power      *powerUp.PowerUp
 	idle       *idle.Idle
 	cron       *cron.Cron
@@ -46,6 +48,7 @@ type PTZRepo interface {
 	Power() PowerRepo
 	Idle() IdleRepo
 	Cron() CronRepo
+	Trace() TraceRepo
 	Manager() ManagerRepo
 }
 
@@ -113,6 +116,12 @@ type ManagerRepo interface {
 	State() *dsd.Status
 }
 
+type TraceRepo interface {
+	List() []dsd.Record
+	StartRecord(id dsd.TraceID) error
+	StopRecord(id dsd.TraceID)
+}
+
 func (b *Blp) Line() LineRepo {
 	return b.line
 }
@@ -133,12 +142,16 @@ func (b *Blp) Cron() CronRepo {
 	return b.cron
 }
 
+func (b *Blp) Trace() TraceRepo {
+	return b.trace
+}
+
 func (b *Blp) Manager() ManagerRepo {
 	return b
 }
 
-func New(basic *basic.Basic, preset *preset.Preset, line *line.Line, cruise *cruise.Cruise, up *powerUp.PowerUp,
-	i *idle.Idle, c *cron.Cron) PTZRepo {
+func New(basic *basic.Basic, preset *preset.Preset, line *line.Line, cruise *cruise.Cruise, trace *trace.Trace,
+	up *powerUp.PowerUp, i *idle.Idle, c *cron.Cron) PTZRepo {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -150,6 +163,7 @@ func New(basic *basic.Basic, preset *preset.Preset, line *line.Line, cruise *cru
 		preset:     preset,
 		line:       line,
 		cruise:     cruise,
+		trace:      trace,
 		power:      up,
 		idle:       i,
 		cron:       c,
@@ -198,6 +212,12 @@ func (b *Blp) Start(req *Request) error {
 
 	// TODO 限位校验
 
+	// 判断云台是否在进行巡迹
+	if b.trace.IsRecording() && req.Trigger != ManualTrigger && req.Ability != ManualFunc {
+		log.Warnf("ptz is trace recording")
+		return errors.New("ptz is trace recording")
+	}
+
 	reqStop := &Request{
 		Trigger: req.Trigger,
 		Ability: st.function,
@@ -224,7 +244,9 @@ func (b *Blp) Start(req *Request) error {
 			return err
 		}
 	case Trace:
-
+		if err := b.trace.Start(dsd.TraceID(req.ID)); err != nil {
+			return err
+		}
 	case LineScan:
 		if err := b.line.Start(b.ctx, dsd.LineScanID(req.ID)); err != nil {
 			return err
@@ -285,7 +307,9 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 			return err
 		}
 	case Trace:
-
+		if err := b.trace.Stop(dsd.TraceID(req.ID)); err != nil {
+			return err
+		}
 	case LineScan:
 		if err := b.line.Stop(dsd.LineScanID(req.ID)); err != nil {
 			return err
@@ -301,6 +325,17 @@ func (b *Blp) stop(ctx context.Context, req *Request) error {
 	case ManualFunc:
 		if err := b.basic.Stop(); err != nil {
 			return err
+		}
+
+		if st.trigger == ManualTrigger && req.Trigger == ManualTrigger &&
+			st.function == ManualFunc && req.Ability == ManualFunc {
+			schedule := &dsd.Schedule{
+				FuncID:    st.funcID,
+				Speed:     st.speed,
+				StartTime: st.startTime,
+				StopTime:  time.Now(),
+			}
+			b.trace.Record(schedule)
 		}
 	default:
 		log.Warnf("invalid ability (%d)", req.Ability)

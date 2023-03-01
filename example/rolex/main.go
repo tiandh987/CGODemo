@@ -399,6 +399,7 @@ func main() {
 	powerRouter(engine)
 	idleRouter(engine)
 	cronRouter(engine)
+	traceRouter(engine)
 
 	engine.Run(":8089")
 
@@ -1271,6 +1272,182 @@ func cronRouter(engine *gin.Engine) {
 			Data:      "",
 			Detail:    "",
 			Message:   "set cron success",
+			Translate: "",
+		})
+		return
+	})
+}
+
+func traceRouter(engine *gin.Engine) {
+	blpInstance := ptzV3.Instance()
+
+	traceGroup := engine.Group("/v1/ptz/pattern")
+
+	// 获取所有巡迹
+	traceGroup.GET("", func(c *gin.Context) {
+		cron := blpInstance.Trace().List()
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      cron,
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 巡迹开始记录
+	traceGroup.POST("/startrecord", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		if err := blpInstance.Trace().StartRecord(dsd.TraceID(idNum)); err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "start record",
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 巡迹停止记录
+	traceGroup.POST("/stoprecord", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		blpInstance.Trace().StopRecord(dsd.TraceID(idNum))
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "stop record",
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 巡迹开始
+	traceGroup.POST("/startreplay", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.Trace,
+			ID:      idNum,
+			Speed:   1,
+		}
+
+		if err := blpInstance.Manager().Start(&req); err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "start record replay",
+			Detail:    "",
+			Message:   "",
+			Translate: "",
+		})
+		return
+	})
+
+	// 巡迹停止
+	traceGroup.POST("/stopreplay", func(c *gin.Context) {
+		id := c.Query("id")
+		idNum, err := strconv.Atoi(id)
+		if err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		req := blp.Request{
+			Trigger: blp.ManualTrigger,
+			Ability: blp.Trace,
+			ID:      idNum,
+			Speed:   1,
+		}
+
+		if err := blpInstance.Manager().Stop(&req); err != nil {
+			log.Errorf(err.Error())
+			c.JSON(http.StatusBadRequest, Response{
+				Code:      400,
+				Data:      nil,
+				Detail:    err.Error(),
+				Message:   "",
+				Translate: "",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Code:      200,
+			Data:      "stop record replay",
+			Detail:    "",
+			Message:   "",
 			Translate: "",
 		})
 		return

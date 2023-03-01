@@ -3,6 +3,7 @@ package dsd
 import (
 	"errors"
 	"github.com/tiandh987/CGODemo/example/rolex/pkg/log"
+	"time"
 )
 
 const (
@@ -38,4 +39,43 @@ type Command struct {
 type CommInfo struct {
 	CommType int      `json:"CommType"`
 	Data     []string `json:"Data"`
+}
+
+// =====
+
+type Record struct {
+	ID            TraceID
+	Enable        bool
+	Valid         bool
+	Schedules     []Schedule
+	StartPosition Position
+}
+
+type Schedule struct {
+	FuncID    int
+	Speed     int
+	StartTime time.Time
+	StopTime  time.Time
+}
+
+type RecordSlice []Record
+
+func (s *RecordSlice) ConfigKey() string {
+	return "Traces"
+}
+
+func NewRecordSlice() RecordSlice {
+	s := make([]Record, MaxTraceNum)
+
+	for id := 1; id <= MaxTraceNum; id++ {
+		s[id-1] = Record{
+			ID:            TraceID(id),
+			Enable:        true,
+			Valid:         false,
+			Schedules:     []Schedule{},
+			StartPosition: NewPosition(),
+		}
+	}
+
+	return s
 }

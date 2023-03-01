@@ -156,6 +156,8 @@ func (s *Serial) Position() (*dsd.Position, error) {
 }
 
 func (s *Serial) Goto(pos *dsd.Position) error {
+	log.Infof("xxxxxxxxxx Goto %+v", pos)
+
 	if err := s.GotoPan(pos); err != nil {
 		return err
 	}

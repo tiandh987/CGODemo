@@ -48,9 +48,10 @@ const (
 )
 
 type state struct {
-	trigger   Trigger   // 触发者
-	function  Ability   // 当前运行功能
-	funcID    int       // 当前运行功能ID
+	trigger   Trigger // 触发者
+	function  Ability // 当前运行功能
+	funcID    int     // 当前运行功能ID
+	speed     int
 	startTime time.Time // 开始时间，单位：毫秒
 
 	pubSub *gochannel.GoChannel
@@ -86,6 +87,10 @@ func (s *state) update(req *Request) {
 	s.function = req.Ability
 	s.funcID = req.ID
 	s.startTime = time.Now()
+
+	if req.Trigger == ManualTrigger && req.Ability == ManualFunc {
+		s.speed = req.Speed
+	}
 
 	if req.Ability == None {
 		msg := message.NewMessage(watermill.NewUUID(), message.Payload(s.startTime.Format("2006-01-02 15:04:05")))
@@ -126,6 +131,7 @@ func (s *state) getInternal() state {
 		function:  s.function,
 		funcID:    s.funcID,
 		startTime: s.startTime,
+		speed:     s.speed,
 	}
 
 	return st
