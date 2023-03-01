@@ -17,8 +17,8 @@ func (l *Line) Default() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.fsm.Current() != none {
-		log.Warnf("line scan is running")
+	if l.running != 0 {
+		log.Warnf("line scan (%d) is running", l.running)
 		return nil
 	}
 
@@ -37,8 +37,8 @@ func (l *Line) Set(scan *dsd.LineScan) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.fsm.Current() != none {
-		log.Warnf("line scan is running")
+	if l.running != 0 {
+		log.Warnf("line scan (%d) is running", l.running)
 		return nil
 	}
 
@@ -59,8 +59,8 @@ func (l *Line) SetMargin(id dsd.LineScanID, op dsd.LineMarginOp) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.fsm.Current() != none {
-		log.Warnf("line scan is running")
+	if l.running != 0 {
+		log.Warnf("line scan (%d) is running", l.running)
 		return nil
 	}
 

@@ -1,7 +1,6 @@
 package line
 
 import (
-	"context"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/basic"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/blp/ptz"
 	"github.com/tiandh987/CGODemo/example/rolex/ptzV3/dsd"
@@ -23,12 +22,12 @@ func TestLine_Start(t *testing.T) {
 
 	line := New(b, slice)
 
-	ctx := context.Background()
+	//ctx := context.Background()
 
-	line.Start(ctx, 1)
+	line.Start(1)
 
 	t.Logf("xxxxxxxxxxxxxxxxxxxxxxxxx")
 
 	time.Sleep(time.Second * 60)
-	line.Stop(ctx, 1)
+	line.Stop(1)
 }

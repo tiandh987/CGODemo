@@ -248,7 +248,7 @@ func (b *Blp) Start(req *Request) error {
 			return err
 		}
 	case LineScan:
-		if err := b.line.Start(b.ctx, dsd.LineScanID(req.ID)); err != nil {
+		if err := b.line.Start(dsd.LineScanID(req.ID)); err != nil {
 			return err
 		}
 	case RegionScan:
